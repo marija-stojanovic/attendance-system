@@ -1,0 +1,26 @@
+# Java / Maven
+**/target/
+*.class
+*.log
+# React / Node
+**/node_modules/
+**/dist/
+**/coverage/
+*.tsbuildinfo
+# Local configuration
+.env
+.env.*
+!.env.example
+*.local
+# Editors and OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+# Original student lists and runtime data
+/st_spisak_studenata_na_predmetu_aktivnost_*.xlsx
+/test-files/local/
+/uploads/
+/exports/
+/data/
