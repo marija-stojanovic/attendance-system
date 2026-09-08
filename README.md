@@ -6,7 +6,7 @@ Planirani stack: Spring Boot, React + TypeScript, PostgreSQL i Docker Compose.
 
 ## Trenutno stanje
 
-Početna struktura i dokumentacija. Aplikacije još nisu generisane i trenutno nema komande za pokretanje sistema.
+Početna struktura i dokumentacija su postavljene. Napravljen je kostur `course-service` aplikacije, dok ostale komponente još nisu napravljene.
 
 ## Struktura
 
@@ -20,7 +20,6 @@ Početna struktura i dokumentacija. Aplikacije još nisu generisane i trenutno n
 
 - [Arhitektura](docs/architecture.md)
 - [Analiza Excel šablona](docs/import-format.md)
-- [Plan razvoja](docs/backlog.md)
 - [Zajednički rad](CONTRIBUTING.md)
 
 ## Razvojno okruženje
