@@ -6,7 +6,7 @@ Planirani stack: Spring Boot, React + TypeScript, PostgreSQL i Docker Compose.
 
 ## Trenutno stanje
 
-Početna struktura i dokumentacija su postavljene. Napravljen je kostur `course-service` aplikacije, dok ostale komponente još nisu napravljene.
+Početna struktura i dokumentacija su postavljene. `course-service` je povezan sa PostgreSQL bazom, dok ostale komponente još nisu napravljene.
 
 ## Struktura
 
@@ -38,6 +38,22 @@ docker compose version
 
 Pri generisanju aplikacija dogovoriti i zabilježiti kompatibilne verzije Jave, Spring Boota i Spring Clouda, Node.js i Docker image tagove. Uključiti Maven Wrapper i npm lock fajl u Git.
 
-Sljedeći cilj: kostur koji se na oba računara pokreće sa `docker compose up --build`. Compose fajl će biti dodat uz aplikacije koje pokreće.
+## Pokretanje
+
+Iz glavnog foldera projekta pokrenuti:
+
+```powershell
+docker compose up --build
+```
+
+Kada se aplikacija pokrene, njeno stanje se može provjeriti na `http://localhost:8081/actuator/health`.
+
+Za zaustavljanje koristiti:
+
+```powershell
+docker compose down
+```
+
+Vrijednosti iz `.env.example` su razvojne vrijednosti. Za lokalnu promjenu kopirati fajl kao `.env`; taj fajl se ne šalje na GitHub.
 
 Za automatizovane testove koristiti sintetičke podatke istog rasporeda.
