@@ -6,7 +6,7 @@ Planirani stack: Spring Boot, React + TypeScript, PostgreSQL i Docker Compose.
 
 ## Trenutno stanje
 
-Početna struktura i dokumentacija su postavljene. `course-service` je povezan sa PostgreSQL bazom, dok ostale komponente još nisu napravljene.
+Početna struktura i dokumentacija su postavljene. `course-service` je povezan sa PostgreSQL bazom i podržava dodavanje i pregled predmeta, uz validaciju i osnovne testove. Ostale komponente još nisu napravljene.
 
 ## Struktura
 
