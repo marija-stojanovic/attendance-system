@@ -24,6 +24,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-course_db}
       DB_USERNAME: ${POSTGRES_USER:-course_user}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-course_password}
+      STUDENT_EMAIL_DOMAIN: ${STUDENT_EMAIL_DOMAIN:-student.etf.org}
     ports:
       - "${COURSE_SERVICE_PORT:-8081}:8081"
     depends_on:
