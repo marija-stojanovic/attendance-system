@@ -51,7 +51,9 @@ Uspješno dodavanje vraća status `201`, zaglavlje `Location` sa putanjom predme
 
 Neispravni podaci vraćaju `400`, nepostojeći predmet `404`, a zauzeta šifra `409`. Greške validacije sadrže polje `errors` sa porukama za šifru ili naziv.
 
-Ova verzija vraća sve predmete. Filtriranje prema zaposlenom, autentifikacija, izmjena predmeta, izvođenja, nastavnici i grupe još nisu implementirani.
+Ova verzija vraća sve predmete. Filtriranje prema zaposlenom, autentifikacija, izmjena osnovnih podataka predmeta i povezivanje nastavnika još nisu implementirani.
+
+Studenti, automatski emailovi, izvođenja, grupe i upisi opisani su u [uputstvu za studente i upise](../docs/students-and-enrollments.md).
 
 Testovi se pokreću iz foldera `backend/course-service`:
 

@@ -16,6 +16,9 @@ spring:
   flyway:
     enabled: true
 
+students:
+  email-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.org}
+
 server:
   port: 8081
 

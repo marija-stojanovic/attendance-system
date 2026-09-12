@@ -6,7 +6,7 @@ Planirani stack: Spring Boot, React + TypeScript, PostgreSQL i Docker Compose.
 
 ## Trenutno stanje
 
-Početna struktura i dokumentacija su postavljene. `course-service` je povezan sa PostgreSQL bazom i podržava dodavanje i pregled predmeta, uz validaciju i osnovne testove. Ostale komponente još nisu napravljene.
+Početna struktura i dokumentacija su postavljene. `course-service` je povezan sa PostgreSQL bazom i podržava dodavanje i pregled predmeta, upravljanje studentima, generisanje institucionalnih emailova, izvođenja predmeta, grupe i upise. Funkcionalnosti su pokrivene validacijom i testovima. Ostale komponente još nisu napravljene.
 
 ## Struktura
 
@@ -21,6 +21,7 @@ Početna struktura i dokumentacija su postavljene. `course-service` je povezan s
 - [Arhitektura](docs/architecture.md)
 - [Analiza Excel šablona](docs/import-format.md)
 - [Zajednički rad](CONTRIBUTING.md)
+- [Studenti i upisi](docs/students-and-enrollments.md)
 
 ## Razvojno okruženje
 
