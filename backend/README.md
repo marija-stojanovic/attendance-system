@@ -57,6 +57,8 @@ Studenti, automatski emailovi, izvođenja, grupe i upisi opisani su u [uputstvu 
 
 Excel i CSV fajlovi mogu se poslati na `POST /api/imports/preview` radi čitanja i validacije, bez upisa u bazu. Format i primjeri su u [uputstvu za pregled uvoza](../docs/import-preview.md).
 
+Za stvarni upis koristi se `POST /api/imports` sa fajlom i akademskom godinom. Upis je transakcioni i ponovljen upload ne stvara duplikate. Pravila sukoba i odgovor opisani su u [uputstvu za upis uvoza](../docs/import-commit.md).
+
 Testovi se pokreću iz foldera `backend/course-service`:
 
 ```powershell
