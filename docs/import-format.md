@@ -43,4 +43,4 @@ Red 7 označava A: redni broj, B: prezime, C: ime, D: indeks, E: status. Ostale 
 - Validirati prije upisa, prijaviti broj problematičnog reda i spriječiti dupliranje pri ponovnom uvozu.
 - CSV šablon, kodiranje i separator tek treba potvrditi jer CSV nije dostavljen.
 
-Parser još nije implementiran.
+Prvi dio parsera je implementiran: upload, pregled i validacija bez upisa u bazu. Format CSV-a, endpoint i konfiguracija opisani su u [uputstvu za pregled uvoza](import-preview.md).

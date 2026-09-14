@@ -55,6 +55,8 @@ Ova verzija vraća sve predmete. Filtriranje prema zaposlenom, autentifikacija, 
 
 Studenti, automatski emailovi, izvođenja, grupe i upisi opisani su u [uputstvu za studente i upise](../docs/students-and-enrollments.md).
 
+Excel i CSV fajlovi mogu se poslati na `POST /api/imports/preview` radi čitanja i validacije, bez upisa u bazu. Format i primjeri su u [uputstvu za pregled uvoza](../docs/import-preview.md).
+
 Testovi se pokreću iz foldera `backend/course-service`:
 
 ```powershell

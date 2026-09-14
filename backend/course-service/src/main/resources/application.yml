@@ -1,6 +1,10 @@
 spring:
   application:
     name: course-service
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/course_db}
     username: ${DB_USERNAME:course_user}
@@ -18,6 +22,15 @@ spring:
 
 students:
   email-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.org}
+
+course-import:
+  max-rows: 5000
+  max-columns: 64
+  header-scan-rows: 100
+  layouts:
+    etf:
+      sheet-name: st_spisak_studenata_na_predmetu
+      metadata-value-offset: 1
 
 server:
   port: 8081
