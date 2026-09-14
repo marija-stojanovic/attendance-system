@@ -2,7 +2,7 @@
 
 Prvi dio uvoza omogućava upload, čitanje i validaciju jednog `.xlsx` ili `.csv` fajla. Rezultat je pregled podataka ili lista grešaka. Ovaj endpoint ne čuva podatke u bazi niti čuva uploadovani fajl u projektnim folderima.
 
-Drugi dio će povezati provjereni sadržaj sa predmetima, izvođenjima, studentima, grupama i upisima. Upis svih podataka u jednoj transakciji i zaštita od dupliranja pri ponovnom uvozu ostaju za taj dio.
+Drugi dio je dostupan kroz zaseban `POST /api/imports`, opisan u [uputstvu za upis uvoza](import-commit.md). Pregled i dalje ne mijenja bazu.
 
 ## Upload
 
@@ -57,7 +57,7 @@ Studenti: prezime, ime, indeks i status. Čitanje počinje ispod zaglavlja, odno
 
 Spojene Excel ćelije čitaju se preko njihove početne ćelije. Indeksi i šifre čuvaju se kao tekst; za numeričke ćelije koristi se prikazana Excel vrijednost, uključujući formatirane početne nule. Ako je Excel već izgubio početne nule, parser ih ne može rekonstruisati. Formule, Excel greške i logičke vrijednosti u obaveznim poljima se odbijaju; formule se ne izvršavaju.
 
-Naslov sa kalendarskom godinom, npr. `2025. godina`, ne pretvara se automatski u akademsku godinu. Izbor akademske godine biće dio potvrde upisa u drugom koraku.
+Naslov sa kalendarskom godinom, npr. `2025. godina`, ne pretvara se automatski u akademsku godinu. Akademska godina se zadaje pri pozivu endpointa za upis.
 
 ## CSV
 

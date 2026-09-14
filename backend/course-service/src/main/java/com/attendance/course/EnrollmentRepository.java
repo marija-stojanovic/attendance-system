@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Enrollment> findByStudentIdAndOfferingId(UUID studentId, UUID offeringId);
     boolean existsByStudentIdAndOfferingId(UUID studentId, UUID offeringId);
 
     List<Enrollment> findByOfferingIdOrderByStudentLastNameAscStudentFirstNameAscStudentIndexNumberAsc(UUID offeringId);
