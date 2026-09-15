@@ -17,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -35,6 +36,7 @@ class ImportCommitTests {
     @Autowired private EnrollmentRepository enrollments;
     @Autowired private ImportPreviewService previews;
     @Autowired private ImportCommitService imports;
+    @Autowired private JdbcTemplate jdbc;
 
     @BeforeEach
     void clear() {
@@ -131,7 +133,7 @@ class ImportCommitTests {
     void rejectsConflictingCourseAndOfferingMetadata() throws Exception {
         upload(ImportParserTests.CSV, "2026/2027");
         for (String changed : List.of(ImportParserTests.CSV.replace("Тестни предмет", "Други назив"),
-                ImportParserTests.CSV.replace(";1;2;", ";1;3;"))) {
+                ImportParserTests.CSV.replace(";4;8;", ";4;9;"))) {
             mvc.perform(multipart("/api/imports").file(file(changed)).param("academicYear", "2026/2027"))
                     .andExpect(status().isConflict());
         }
@@ -157,14 +159,42 @@ class ImportCommitTests {
     }
 
     @Test
-    void acceptsExcelAndReusesCsvData() throws Exception {
-        upload(ImportParserTests.CSV, "2026/2027");
-        try (var input = getClass().getResourceAsStream("/imports/anonymous-course.xlsx")) {
-            mvc.perform(multipart("/api/imports").file(new MockMultipartFile("file", "example.xlsx", "application/octet-stream", input))
-                            .param("academicYear", "2026/2027"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("studentsCreated").value(0))
-                    .andExpect(jsonPath("enrollmentsCreated").value(0));
+    void repeatsExcelWithoutDuplicates() throws Exception {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try (var input = getClass().getResourceAsStream("/imports/anonymous-course.xlsx")) {
+                mvc.perform(multipart("/api/imports").file(new MockMultipartFile("file", "example.xlsx",
+                                        "application/octet-stream", input)).param("academicYear", "2026/2027"))
+                        .andExpect(status().isOk()).andExpect(jsonPath("studentsCreated").value(attempt == 0 ? 2 : 0))
+                        .andExpect(jsonPath("enrollmentsCreated").value(attempt == 0 ? 2 : 0));
+            }
         }
+    }
+
+    @Test
+    void assignsFirstYearLaboratoryGroupsAndReportsUncoveredIndex() throws Exception {
+        String input = "Predmet;Šifra;Studijski program;Tip studija;Godina studija;Semestar;Oblik nastave;Grupa\n"
+                + "Testni predmet;GRUPE-1;Računarstvo i informatika;OSNOVNE;1;1;laboratorijske vježbe;1\n\n"
+                + "Prezime;Ime;Indeks;Status\n"
+                + "Prvić;Ana;1101/25;REDOVAN\n"
+                + "Drugić;Bojan;1122/25;REDOVAN\n"
+                + "Trećić;Ceca;1250/25;REDOVAN\n";
+
+        JsonNode result = upload(input, "2025/2026");
+
+        assertThat(result.get("groupsCreated").asInt()).isEqualTo(2);
+        assertThat(result.get("groupIds")).hasSize(2);
+        assertThat(result.get("groupMembershipsAdded").asInt()).isEqualTo(2);
+        assertThat(result.get("warnings")).hasSize(1);
+        assertThat(result.get("warnings").get(0).get("message").asText()).contains("1250/25");
+        assertThat(groups.findAll()).extracting(TeachingGroup::getGroupNumber).containsExactlyInAnyOrder("L1", "L2");
+
+        Integer uncoveredMemberships = jdbc.queryForObject("""
+                select count(*) from enrollment_groups eg
+                join enrollments e on e.id = eg.enrollment_id
+                join students s on s.id = e.student_id
+                where s.index_number = '1250/25'
+                """, Integer.class);
+        assertThat(uncoveredMemberships).isZero();
     }
 
     @Test

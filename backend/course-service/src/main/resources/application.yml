@@ -32,6 +32,62 @@ course-import:
       sheet-name: st_spisak_studenata_na_predmetu
       metadata-value-offset: 1
 
+group-assignment:
+  lecture-group: ALL
+  cohorts:
+    "25":
+      auditory:
+        - group: G1
+          ranges:
+            - { prefix: "11", from: 1, to: 59 }
+        - group: G2
+          ranges:
+            - { prefix: "11", from: 60, to: 117 }
+        - group: G3
+          ranges:
+            - { prefix: "11", from: 118, to: 123 }
+            - { prefix: "12", from: 1, to: 52 }
+        - group: G4
+          ranges:
+            - { prefix: "12", from: 53, to: 55 }
+            - { prefix: "13", from: 1, to: 53 }
+      laboratory:
+        - group: L1
+          ranges:
+            - { prefix: "11", from: 1, to: 21 }
+        - group: L2
+          ranges:
+            - { prefix: "11", from: 22, to: 44 }
+        - group: L3
+          ranges:
+            - { prefix: "11", from: 45, to: 65 }
+        - group: L4
+          ranges:
+            - { prefix: "11", from: 66, to: 88 }
+        - group: L5
+          ranges:
+            - { prefix: "11", from: 89, to: 108 }
+        - group: L6
+          ranges:
+            - { prefix: "11", from: 109, to: 123 }
+            - { prefix: "12", from: 1, to: 6 }
+        - group: L7
+          ranges:
+            - { prefix: "12", from: 7, to: 26 }
+        - group: L8
+          ranges:
+            - { prefix: "12", from: 27, to: 49 }
+        - group: L9
+          ranges:
+            - { prefix: "12", from: 51, to: 55 }
+            - { prefix: "13", from: 1, to: 16 }
+        - group: L10
+          ranges:
+            - { prefix: "13", from: 17, to: 37 }
+        - group: L11
+          ranges:
+            - { prefix: "13", from: 38, to: 53 }
+
 server:
   port: 8081
 

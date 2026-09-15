@@ -3,6 +3,7 @@ package com.attendance.course.imports;
 import com.attendance.course.ActivityType;
 import com.attendance.course.CreateStudentRequest;
 import com.attendance.course.StudentEmailGenerator;
+import com.attendance.course.groups.GroupAssignmentService;
 import jakarta.validation.Validator;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -17,11 +18,14 @@ public class ImportParser {
     private final ImportProperties properties;
     private final Validator validator;
     private final StudentEmailGenerator emails;
+    private final GroupAssignmentService groupAssignments;
 
-    public ImportParser(ImportProperties properties, Validator validator, StudentEmailGenerator emails) {
+    public ImportParser(ImportProperties properties, Validator validator, StudentEmailGenerator emails,
+                        GroupAssignmentService groupAssignments) {
         this.properties = properties;
         this.validator = validator;
         this.emails = emails;
+        this.groupAssignments = groupAssignments;
     }
 
     ImportPreview parse(ImportTable table, ImportProperties.Layout layout) {
@@ -55,6 +59,7 @@ public class ImportParser {
                 metadata.get(ImportField.COURSE_CODE), metadata.get(ImportField.STUDY_PROGRAM),
                 metadata.get(ImportField.STUDY_TYPE), year, semester, activity, metadata.get(ImportField.GROUP_NUMBER));
         List<ImportPreview.StudentRow> students = new ArrayList<>();
+        List<ImportPreview.RowWarning> warnings = new ArrayList<>();
         Map<String, Integer> indexes = new HashMap<>();
         int start = studentHeader.row() + 1;
         for (var merge : table.merges()) {
@@ -95,13 +100,19 @@ public class ImportParser {
                     errors.add(new ImportPreview.RowError(row, "indexNumber", "Broj indeksa je već naveden u redu " + previous + "."));
                 }
             }
+            var assignment = groupAssignments.assign(year, activity, metadata.get(ImportField.GROUP_NUMBER),
+                    student.indexNumber());
+            if (assignment.note() != null) {
+                warnings.add(new ImportPreview.RowWarning(row, "groupNumber", assignment.note()));
+            }
             students.add(new ImportPreview.StudentRow(row, student.lastName(), student.firstName(),
-                    student.indexNumber(), data.get(ImportField.STATUS)));
+                    student.indexNumber(), data.get(ImportField.STATUS), assignment.groupNumber()));
         }
         if (students.isEmpty()) {
             errors.add(new ImportPreview.RowError(null, "students", "Fajl ne sadrži studente."));
         }
-        return errors.isEmpty() ? new ImportPreview(true, result, List.copyOf(students), List.of()) : invalid(errors);
+        return errors.isEmpty() ? new ImportPreview(true, result, List.copyOf(students), List.of(), List.copyOf(warnings))
+                : invalid(errors);
     }
 
     private Header findHeader(ImportTable table, ImportProperties.Layout layout, List<ImportField> fields,
@@ -183,7 +194,7 @@ public class ImportParser {
     }
 
     private ImportPreview invalid(List<ImportPreview.RowError> errors) {
-        return new ImportPreview(false, null, List.of(), List.copyOf(errors));
+        return new ImportPreview(false, null, List.of(), List.copyOf(errors), List.of());
     }
 
     private record Header(int row, Map<ImportField, Integer> columns) {

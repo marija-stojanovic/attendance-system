@@ -22,7 +22,7 @@ curl.exe -X POST http://localhost:8081/api/imports/preview -F "file=@backend/cou
 
 Za CSV zamijeniti naziv fajla sa `anonymous-course.csv`.
 
-Ispravan fajl vraća `200`, `valid: true`, objekat `metadata`, listu `students` i praznu listu `errors`. Svaki student sadrži izvorni broj reda, prezime, ime, indeks i status.
+Ispravan fajl vraća `200`, `valid: true`, objekat `metadata`, listu `students` i praznu listu `errors`. Svaki student sadrži izvorni broj reda, prezime, ime, indeks, status i `assignedGroup`. Lista `warnings` sadrži napomene koje ne prekidaju uvoz.
 
 Neispravni podaci vraćaju `422`, `valid: false`, `metadata: null`, praznu listu studenata i sve pronađene greške. Time se ne vraća djelimično prihvaćena lista.
 
@@ -37,7 +37,8 @@ Neispravni podaci vraćaju `422`, `valid: false`, `metadata: null`, praznu listu
       "field": "firstName",
       "message": "Ime je obavezno."
     }
-  ]
+  ],
+  "warnings": []
 }
 ```
 
@@ -58,6 +59,12 @@ Studenti: prezime, ime, indeks i status. Čitanje počinje ispod zaglavlja, odno
 Spojene Excel ćelije čitaju se preko njihove početne ćelije. Indeksi i šifre čuvaju se kao tekst; za numeričke ćelije koristi se prikazana Excel vrijednost, uključujući formatirane početne nule. Ako je Excel već izgubio početne nule, parser ih ne može rekonstruisati. Formule, Excel greške i logičke vrijednosti u obaveznim poljima se odbijaju; formule se ne izvršavaju.
 
 Naslov sa kalendarskom godinom, npr. `2025. godina`, ne pretvara se automatski u akademsku godinu. Akademska godina se zadaje pri pozivu endpointa za upis.
+
+## Određivanje grupe
+
+Za prvu godinu se grupa računa prema obliku nastave i broju indeksa. Auditorne vježbe koriste grupe `G1`–`G4`, laboratorijske grupe `L1`–`L11`, a predavanja zajedničku grupu `ALL`. Za ostale godine koristi se grupa iz zaglavlja fajla.
+
+Ako indeks prve godine nije obuhvaćen podešenim rasponima, `assignedGroup` je `null`, a odgovor sadrži upozorenje sa brojem reda. Detaljna pravila su opisana u [dokumentu o određivanju grupa](group-assignment.md).
 
 ## CSV
 
@@ -136,5 +143,7 @@ Standardna provjera iz `backend/course-service`:
 ```powershell
 .\mvnw.cmd -B -ntp test
 ```
+
+`GroupAssignmentServiceTests` provjerava granice svih podešenih raspona i nepokriveni indeks `1250/25`.
 
 Ovaj korak dodaje backend API. Korisnički ekran za upload i kontrola pristupa zaposlenih još nisu implementirani.

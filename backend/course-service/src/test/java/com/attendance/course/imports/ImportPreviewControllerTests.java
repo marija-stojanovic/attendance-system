@@ -2,6 +2,7 @@ package com.attendance.course.imports;
 
 import com.attendance.course.ApiExceptionHandler;
 import com.attendance.course.StudentEmailGenerator;
+import com.attendance.course.groups.GroupAssignmentService;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +18,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "course-import.layouts.other.metadata-value-offset=1",
         "course-import.layouts.other.aliases.courseCode[0]=ID predmet"
 })
-@Import({ImportPreviewService.class, ImportFileReader.class, ImportParser.class, StudentEmailGenerator.class, ApiExceptionHandler.class})
+@Import({ImportPreviewService.class, ImportFileReader.class, ImportParser.class, StudentEmailGenerator.class,
+        GroupAssignmentService.class, ApiExceptionHandler.class})
 class ImportPreviewControllerTests {
     @Autowired private MockMvc mvc;
 

@@ -7,11 +7,10 @@ Sa sačuvanim prethodnim izmjenama:
 ```bash
 git switch main
 git pull --ff-only
-git switch -c codex/course-import
+git switch -c feature/course-import
 ```
 
 Naziv grane prilagoditi zadatku. Prije commita pregledati `git status` i `git diff --cached`.
-
 
 
 
