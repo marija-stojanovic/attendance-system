@@ -3,7 +3,10 @@ package com.attendance.course.imports;
 import com.attendance.course.*;
 import java.text.Normalizer;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -74,16 +77,25 @@ public class ImportCommitService {
         } else if (offering.getYearOfStudy() != metadata.yearOfStudy() || offering.getSemester() != metadata.semester()) {
             throw conflict("Izvođenje predmeta postoji sa drugačijom godinom studija ili semestrom.");
         }
-        TeachingGroup group = groups.findByOfferingIdAndActivityTypeAndGroupNumber(offering.getId(),
-                metadata.activityType(), metadata.groupNumber()).orElse(null);
-        boolean groupCreated = group == null;
-        if (groupCreated) {
-            group = groups.saveAndFlush(new TeachingGroup(offering, metadata.activityType(), metadata.groupNumber()));
-        }
+        Map<String, TeachingGroup> usedGroups = new LinkedHashMap<>();
+        int createdGroups = 0;
         int createdStudents = 0;
         int createdEnrollments = 0;
         int memberships = 0;
         for (var row : preview.students().stream().sorted(Comparator.comparing(ImportPreview.StudentRow::indexNumber)).toList()) {
+            TeachingGroup group = null;
+            if (row.assignedGroup() != null) {
+                group = usedGroups.get(row.assignedGroup());
+                if (group == null) {
+                    group = groups.findByOfferingIdAndActivityTypeAndGroupNumber(offering.getId(),
+                            metadata.activityType(), row.assignedGroup()).orElse(null);
+                    if (group == null) {
+                        group = groups.saveAndFlush(new TeachingGroup(offering, metadata.activityType(), row.assignedGroup()));
+                        createdGroups++;
+                    }
+                    usedGroups.put(row.assignedGroup(), group);
+                }
+            }
             Student student = students.findByIndexNumber(row.indexNumber()).orElse(null);
             if (student == null) {
                 int suffix = 1;
@@ -97,25 +109,28 @@ public class ImportCommitService {
                 throw conflict("Red " + row.row() + ": broj indeksa postoji sa drugačijim imenom ili prezimenom.");
             }
             Enrollment enrollment = enrollments.findByStudentIdAndOfferingId(student.getId(), offering.getId()).orElse(null);
+            Set<TeachingGroup> selectedGroup = group == null ? Set.of() : Set.of(group);
             if (enrollment == null) {
-                enrollments.saveAndFlush(new Enrollment(student, offering, row.status(), Set.of(group)));
+                enrollments.saveAndFlush(new Enrollment(student, offering, row.status(), selectedGroup));
                 createdEnrollments++;
-                memberships++;
+                memberships += selectedGroup.size();
             } else {
                 if (!same(enrollment.getStatus(), row.status())) {
                     throw conflict("Red " + row.row() + ": postojeći upis ima drugačiji status.");
                 }
-                var groupId = group.getId();
-                if (enrollment.getGroups().stream().noneMatch(existing -> existing.getId().equals(groupId))) {
+                var groupId = group == null ? null : group.getId();
+                if (groupId != null && enrollment.getGroups().stream().noneMatch(existing -> existing.getId().equals(groupId))) {
                     enrollment.getGroups().add(group);
                     memberships++;
                 }
             }
         }
         enrollments.flush();
-        return new ImportResult(course.getId(), offering.getId(), group.getId(), courseCreated, offeringCreated,
-                groupCreated, createdStudents, preview.students().size() - createdStudents, createdEnrollments,
-                preview.students().size() - createdEnrollments, memberships);
+        List<java.util.UUID> groupIds = usedGroups.values().stream().map(TeachingGroup::getId).toList();
+        java.util.UUID groupId = groupIds.size() == 1 ? groupIds.getFirst() : null;
+        return new ImportResult(course.getId(), offering.getId(), groupId, groupIds, courseCreated, offeringCreated,
+                createdGroups > 0, createdGroups, createdStudents, preview.students().size() - createdStudents,
+                createdEnrollments, preview.students().size() - createdEnrollments, memberships, preview.warnings());
     }
 
     private boolean same(String first, String second) {

@@ -2,6 +2,8 @@ package com.attendance.course.imports;
 
 import com.attendance.course.ActivityType;
 import com.attendance.course.StudentEmailGenerator;
+import com.attendance.course.groups.GroupAssignmentProperties;
+import com.attendance.course.groups.GroupAssignmentService;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
 import java.io.ByteArrayOutputStream;
@@ -26,7 +28,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class ImportParserTests {
     static final String CSV = "Предмет;Шифра;Студијски програм;Тип студија;Година студија;Семестар;Облик наставе;Група\n"
-            + "Тестни предмет;DEMO-101;Тестни програм;ОСНОВНЕ;1;2;вјежбе;1\n\n"
+            + "Тестни предмет;DEMO-101;Тестни програм;ОСНОВНЕ;4;8;вјежбе;1\n\n"
             + "Презиме;Име;Индекс;Статус\nИзмишљић;Јана;TEST-001/2099;РЕДОВАН\n\n"
             + "Примјерић;Ана Марија;TEST-002/2099;ОБНОВА\n";
     private static ValidatorFactory validation;
@@ -57,6 +59,8 @@ class ImportParserTests {
         assertThat(result.students().getFirst().row()).isEqualTo(5);
         assertThat(result.students().getLast().row()).isEqualTo(7);
         assertThat(result.students().getLast().firstName()).isEqualTo("Ана Марија");
+        assertThat(result.students()).extracting(ImportPreview.StudentRow::assignedGroup).containsOnly("1");
+        assertThat(result.warnings()).isEmpty();
     }
 
     @ParameterizedTest
@@ -120,7 +124,7 @@ class ImportParserTests {
 
     @Test
     void rejectsInvalidMetadataAndEmptyStudentList() {
-        ImportPreview result = csv(CSV.replace(";1;2;вјежбе;1", ";0;40000;непознато;"));
+        ImportPreview result = csv(CSV.replace(";4;8;вјежбе;1", ";0;40000;непознато;"));
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).extracting(ImportPreview.RowError::field)
                 .contains("yearOfStudy", "semester", "activityType", "groupNumber");
@@ -262,7 +266,8 @@ class ImportParserTests {
 
     private ImportPreviewService service(ImportProperties properties) {
         return new ImportPreviewService(properties, new ImportFileReader(properties),
-                new ImportParser(properties, validation.getValidator(), new StudentEmailGenerator("student.etf.org")));
+                new ImportParser(properties, validation.getValidator(), new StudentEmailGenerator("student.etf.org"),
+                        new GroupAssignmentService(new GroupAssignmentProperties("ALL", Map.of()))));
     }
 
     private ImportPreview csv(String content) {

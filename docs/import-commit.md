@@ -23,7 +23,9 @@ Za Excel se koristi `anonymous-course.xlsx`. Ova komanda za razliku od `/api/imp
 
 ## Pravila upisa
 
-Predmet se traži po šifri. Izvođenje se traži po predmetu, akademskoj godini, studijskom programu i tipu studija. Grupa se traži po izvođenju, obliku nastave i oznaci grupe. Student se traži po indeksu, a upis po studentu i izvođenju. Ako zapis ne postoji, kreira se.
+Predmet se traži po šifri. Izvođenje se traži po predmetu, akademskoj godini, studijskom programu i tipu studija. Student se traži po indeksu, a upis po studentu i izvođenju. Ako zapis ne postoji, kreira se.
+
+Za prvu godinu grupa se određuje za svakog studenta prema obliku nastave i indeksu. Jedan fajl zato može napraviti više grupa. Za ostale godine koristi se grupa iz zaglavlja. Student sa nepokrivenim indeksom upisuje se bez grupe i dobija upozorenje koje se vraća u odgovoru. Pravila su opisana u [dokumentu o određivanju grupa](group-assignment.md).
 
 Novi studenti dobijaju email po postojećim pravilima i podešenom domenu. Postojećim studentima email se ne mijenja. Izvorni tekst studijskog programa ostaje sačuvan, uključujući eventualni spisak programa odvojen tačka-zarezom.
 
@@ -52,11 +54,15 @@ Uspješan uvoz vraća `200`, uključujući potpuno ponovljen zahtjev:
 
 | Polje | Značenje |
 | --- | --- |
-| `courseId`, `offeringId`, `groupId` | Identifikatori korištenih zapisa |
-| `courseCreated`, `offeringCreated`, `groupCreated` | Da li su zapisi novokreirani |
+| `courseId`, `offeringId` | Identifikatori predmeta i izvođenja |
+| `groupId` | Identifikator kada je korištena samo jedna grupa; kod više grupa je `null` |
+| `groupIds` | Identifikatori svih grupa korištenih u uvozu |
+| `courseCreated`, `offeringCreated`, `groupCreated` | Da li je napravljen predmet, izvođenje ili najmanje jedna grupa |
+| `groupsCreated` | Broj novih grupa |
 | `studentsCreated`, `studentsReused` | Novi i postojeći studenti |
 | `enrollmentsCreated`, `enrollmentsReused` | Novi i postojeći upisi |
 | `groupMembershipsAdded` | Broj dodatih veza sa grupom |
+| `warnings` | Napomene za studente kojima grupa nije automatski određena |
 
 Za drugi identičan upload broj novih studenata, upisa i veza sa grupom je nula. Neispravan fajl vraća `422` sa greškama parsera i bez upisa. Pogrešna ili izostavljena akademska godina vraća `400`. Ograničenja formata i veličine fajla ostaju ista kao kod pregleda.
 
@@ -64,7 +70,7 @@ Za drugi identičan upload broj novih studenata, upisa i veza sa grupom je nula.
 
 `ImportCommitController` prima fajl i akademsku godinu. `ImportCommitService` upravlja transakcijom, ponovnim pokušajima, pronalaženjem postojećih zapisa i kreiranjem nedostajućih podataka. `ImportResult` definiše izvještaj. Repozitoriji su dopunjeni upitima za pronalaženje jedinstvenih zapisa i zaključavanje.
 
-`ImportCommitTests` pokriva stvarni HTTP poziv do baze, ponavljanje uvoza, Excel/CSV ekvivalentnost, više godina i predmeta, više grupa, kolizije emaila, sukobe podataka, rollback i istovremene zahtjeve. Koristi samo anonimne primjere iz prvog dijela.
+`ImportCommitTests` pokriva stvarni HTTP poziv do baze, ponavljanje uvoza, više godina i predmeta, više grupa, automatsko raspoređivanje, upozorenje za nepokriveni indeks, kolizije emaila, sukobe podataka, rollback i istovremene zahtjeve. Koristi samo anonimne primjere iz prvog dijela.
 
 Standardni testovi iz `backend/course-service`:
 
