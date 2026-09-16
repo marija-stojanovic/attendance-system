@@ -1,6 +1,23 @@
 name: attendance-system
 
 services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.3
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./infra/keycloak:/opt/keycloak/data/import:ro
+
   postgres:
     image: postgres:17.11-alpine3.24
     environment:
@@ -25,6 +42,10 @@ services:
       DB_USERNAME: ${POSTGRES_USER:-course_user}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-course_password}
       STUDENT_EMAIL_DOMAIN: ${STUDENT_EMAIL_DOMAIN:-student.etf.org}
+      EMPLOYEE_EMAIL_DOMAIN: ${EMPLOYEE_EMAIL_DOMAIN:-etf.org}
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:8080/realms/attendance-system}
+      OIDC_JWK_SET_URI: http://keycloak:8080/realms/attendance-system/protocol/openid-connect/certs
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
     ports:
       - "${COURSE_SERVICE_PORT:-8081}:8081"
     depends_on:
@@ -38,4 +59,5 @@ services:
       start_period: 20s
 
 volumes:
+  keycloak_data:
   course_postgres_data:

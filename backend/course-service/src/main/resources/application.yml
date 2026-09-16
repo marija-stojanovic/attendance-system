@@ -96,3 +96,11 @@ management:
     web:
       exposure:
         include: health,info
+
+authentication:
+  issuer: ${OIDC_ISSUER:http://localhost:8080/realms/attendance-system}
+  jwk-set-uri: ${OIDC_JWK_SET_URI:http://localhost:8080/realms/attendance-system/protocol/openid-connect/certs}
+  audience: course-service
+  student-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.org}
+  employee-domain: ${EMPLOYEE_EMAIL_DOMAIN:etf.org}
+  frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}

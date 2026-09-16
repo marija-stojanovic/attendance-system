@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties = "spring.datasource.url=${IMPORT_TEST_DB_URL:jdbc:h2:mem:import_commit;MODE=PostgreSQL;DB_CLOSE_DELAY=-1}")
+@org.springframework.security.test.context.support.WithMockUser(roles = "EMPLOYEE")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class ImportCommitTests {
