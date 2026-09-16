@@ -6,7 +6,7 @@ Planirani stack: Spring Boot, React + TypeScript, PostgreSQL i Docker Compose.
 
 ## Trenutno stanje
 
-Početna struktura i dokumentacija su postavljene. `course-service` je povezan sa PostgreSQL bazom i podržava dodavanje i pregled predmeta, upravljanje studentima, generisanje institucionalnih emailova, izvođenja predmeta, grupe, upise i automatsko određivanje grupa prve godine. Funkcionalnosti su pokrivene validacijom i testovima. Dodata je OIDC prijava preko Keycloaka, provjera uloga na backendu i početni React ekran za prijavu i odjavu.
+Početna struktura i dokumentacija su postavljene. `course-service` je povezan sa PostgreSQL bazom i podržava dodavanje i pregled predmeta, upravljanje studentima, generisanje institucionalnih emailova, izvođenja predmeta, grupe, upise i automatsko određivanje grupa prve godine. Studenti se prijavljuju Google nalogom sa fakultetskog domena, a za razvoj je dostupan jedan lokalni nalog zaposlenog.
 
 ## Struktura
 
@@ -50,7 +50,7 @@ Iz glavnog foldera projekta pokrenuti:
 docker compose up --build
 ```
 
-Kada se aplikacija pokrene, njeno stanje se može provjeriti na `http://localhost:8081/actuator/health`. React aplikacija je dostupna na `http://localhost:5173`. Keycloak administracija je dostupna na `http://localhost:8080`.
+Kada se aplikacija pokrene, njeno stanje se može provjeriti na `http://localhost:8081/actuator/health`. React aplikacija je dostupna na `http://localhost:5173`.
 
 Za zaustavljanje koristiti:
 

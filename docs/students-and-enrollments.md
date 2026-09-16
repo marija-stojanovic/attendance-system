@@ -18,14 +18,14 @@ Postojeća migracija `V1__create_course_tables.sql` već sadrži sve potrebne ta
 
 ## Email
 
-Domen se podešava pomoću `STUDENT_EMAIL_DOMAIN`, a podrazumijevana vrijednost je `student.etf.org`. Postavka se prosljeđuje i kroz Docker Compose.
+Domen se podešava pomoću `STUDENT_EMAIL_DOMAIN`, a podrazumijevana vrijednost je `student.etf.unibl.org`. Postavka se prosljeđuje i kroz Docker Compose.
 
 | Ime i prezime | Email |
 | --- | --- |
-| Đorđe Čavić | `djordje.cavic@student.etf.org` |
-| Ana Marija Petrović Jovanović | `ana-marija.petrovic-jovanovic@student.etf.org` |
-| Љиљана Њежић | `ljiljana.njezic@student.etf.org` |
-| Drugi student Đorđe Čavić | `djordje.cavic.2@student.etf.org` |
+| Đorđe Čavić | `djordje.cavic@student.etf.unibl.org` |
+| Ana Marija Petrović Jovanović | `ana-marija.petrovic-jovanovic@student.etf.unibl.org` |
+| Љиљана Њежић | `ljiljana.njezic@student.etf.unibl.org` |
+| Drugi student Đorđe Čavić | `djordje.cavic.2@student.etf.unibl.org` |
 
 Za email se koriste mala slova, `č` i `ć` postaju `c`, `š` postaje `s`, `ž` postaje `z`, a `đ` postaje `dj`. Srpska ćirilica se transliteriše. Razmaci između dijelova imena postaju crtice, a apostrofi se uklanjaju. Izvorno ime i prezime ostaju sačuvani sa svojim slovima.
 

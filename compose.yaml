@@ -2,21 +2,13 @@ name: attendance-system
 
 services:
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        VITE_API_URL: ${FRONTEND_API_URL:-http://localhost:8081}
     ports:
       - "5173:80"
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.7.3
-    command: start-dev --import-realm
-    environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
-    ports:
-      - "${KEYCLOAK_PORT:-8080}:8080"
-    volumes:
-      - keycloak_data:/opt/keycloak/data
-      - ./infra/keycloak:/opt/keycloak/data/import:ro
 
   postgres:
     image: postgres:17.11-alpine3.24
@@ -41,10 +33,13 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-course_db}
       DB_USERNAME: ${POSTGRES_USER:-course_user}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-course_password}
-      STUDENT_EMAIL_DOMAIN: ${STUDENT_EMAIL_DOMAIN:-student.etf.org}
-      EMPLOYEE_EMAIL_DOMAIN: ${EMPLOYEE_EMAIL_DOMAIN:-etf.org}
-      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:8080/realms/attendance-system}
-      OIDC_JWK_SET_URI: http://keycloak:8080/realms/attendance-system/protocol/openid-connect/certs
+      STUDENT_EMAIL_DOMAIN: ${STUDENT_EMAIL_DOMAIN:-student.etf.unibl.org}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      APP_JWT_SECRET: ${APP_JWT_SECRET:-local-development-secret-change-me-123456789}
+      TEST_EMPLOYEE_ENABLED: ${TEST_EMPLOYEE_ENABLED:-true}
+      TEST_EMPLOYEE_USERNAME: ${TEST_EMPLOYEE_USERNAME:-profesor}
+      TEST_EMPLOYEE_PASSWORD: ${TEST_EMPLOYEE_PASSWORD:-Profesor123!}
+      TEST_EMPLOYEE_EMAIL: ${TEST_EMPLOYEE_EMAIL:-profesor@etf.unibl.org}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
     ports:
       - "${COURSE_SERVICE_PORT:-8081}:8081"
@@ -59,5 +54,4 @@ services:
       start_period: 20s
 
 volumes:
-  keycloak_data:
   course_postgres_data:
