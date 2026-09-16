@@ -55,7 +55,7 @@ class StudentEnrollmentTests {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("indexNumber").value("001/2026"))
                 .andExpect(jsonPath("firstName").value("Ђорђе"))
-                .andExpect(jsonPath("institutionalEmail").value("djordje.cavic@student.etf.org"))
+                .andExpect(jsonPath("institutionalEmail").value("djordje.cavic@student.etf.unibl.org"))
                 .andExpect(jsonPath("createdAt").isNotEmpty()).andReturn();
         String id = json.readTree(result.getResponse().getContentAsString()).get("id").asText();
         assertThat(result.getResponse().getHeader("Location")).isEqualTo("/api/students/" + id);
@@ -69,8 +69,8 @@ class StudentEnrollmentTests {
         student("1/2026", "Đorđe", "Čavić");
         JsonNode second = student("2/2026", "Ђорђе", "Чавић");
         JsonNode third = student("3/2026", "Djordje", "Cavic");
-        assertThat(second.get("institutionalEmail").asText()).isEqualTo("djordje.cavic.2@student.etf.org");
-        assertThat(third.get("institutionalEmail").asText()).isEqualTo("djordje.cavic.3@student.etf.org");
+        assertThat(second.get("institutionalEmail").asText()).isEqualTo("djordje.cavic.2@student.etf.unibl.org");
+        assertThat(third.get("institutionalEmail").asText()).isEqualTo("djordje.cavic.3@student.etf.unibl.org");
     }
 
     @Test

@@ -11,7 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class StudentEmailGenerator {
     private final String domain;
 
-    public StudentEmailGenerator(@Value("${students.email-domain:student.etf.org}") String domain) {
+    public StudentEmailGenerator(@Value("${students.email-domain:student.etf.unibl.org}") String domain) {
         this.domain = domain.strip().toLowerCase(Locale.ROOT);
         if (this.domain.length() > 189 || !this.domain.matches(
                 "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")) {

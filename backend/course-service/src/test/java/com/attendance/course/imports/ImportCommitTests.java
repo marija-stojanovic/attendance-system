@@ -146,7 +146,7 @@ class ImportCommitTests {
     void generatesUniqueEmailsForEqualNames() throws Exception {
         upload(ImportParserTests.CSV.replace("Примјерић;Ана Марија", "Измишљић;Јана"), "2026/2027");
         assertThat(students.findAll()).extracting(Student::getInstitutionalEmail)
-                .containsExactlyInAnyOrder("jana.izmisljic@student.etf.org", "jana.izmisljic.2@student.etf.org");
+                .containsExactlyInAnyOrder("jana.izmisljic@student.etf.unibl.org", "jana.izmisljic.2@student.etf.unibl.org");
     }
 
     @Test

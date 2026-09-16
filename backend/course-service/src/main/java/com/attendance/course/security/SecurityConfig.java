@@ -1,39 +1,99 @@
 package com.attendance.course.security;
 
-import java.util.*;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.OctetSequenceKey;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.core.*;
-import org.springframework.security.oauth2.jwt.*;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.web.cors.*;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 public class SecurityConfig {
     @Bean
-    JwtDecoder jwtDecoder(@Value("${authentication.issuer}") String issuer,
-                          @Value("${authentication.jwk-set-uri}") String keys,
-                          @Value("${authentication.audience}") String audience) {
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(keys).build();
-        decoder.setJwtValidator(tokenValidator(issuer, audience));
-        return decoder;
-    }
-
-    static OAuth2TokenValidator<Jwt> tokenValidator(String issuer, String audience) {
-        return new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(issuer),
-                jwt -> jwt.getAudience().contains(audience) && jwt.getSubject() != null && !jwt.getSubject().isBlank()
-                        && jwt.getExpiresAt() != null
-                        ? OAuth2TokenValidatorResult.success()
-                        : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token")));
+    SecretKey applicationKey(@Value("${authentication.jwt-secret}") String secret) {
+        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length < 32) {
+            throw new IllegalStateException("APP_JWT_SECRET mora imati najmanje 32 znaka.");
+        }
+        return new SecretKeySpec(bytes, "HmacSHA256");
     }
 
     @Bean
-    SecurityFilterChain security(HttpSecurity http, IdentityPolicy policy) throws Exception {
+    JwtEncoder jwtEncoder(SecretKey key) {
+        OctetSequenceKey jwk = new OctetSequenceKey.Builder(key).build();
+        return new NimbusJwtEncoder(new ImmutableJWKSet<SecurityContext>(new JWKSet(jwk)));
+    }
+
+    @Bean
+    @Primary
+    JwtDecoder applicationJwtDecoder(SecretKey key,
+            @Value("${authentication.app-issuer}") String issuer,
+            @Value("${authentication.audience}") String audience) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                new JwtTimestampValidator(),
+                jwt -> valid(jwt.getIssuer() != null && issuer.equals(jwt.getIssuer().toString())
+                        && jwt.getAudience().contains(audience)
+                        && jwt.getSubject() != null && !jwt.getSubject().isBlank())));
+        return decoder;
+    }
+
+    @Bean("googleJwtDecoder")
+    JwtDecoder googleJwtDecoder(@Value("${authentication.google-client-id}") String clientId) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri("https://www.googleapis.com/oauth2/v3/certs")
+                .jwsAlgorithm(SignatureAlgorithm.RS256).build();
+        OAuth2TokenValidator<Jwt> googleClaims = jwt -> {
+            String issuer = jwt.getIssuer() == null ? "" : jwt.getIssuer().toString();
+            return valid((issuer.equals("https://accounts.google.com") || issuer.equals("accounts.google.com"))
+                    && !clientId.isBlank() && jwt.getAudience().contains(clientId)
+                    && jwt.getSubject() != null && !jwt.getSubject().isBlank());
+        };
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(new JwtTimestampValidator(), googleClaims));
+        return decoder;
+    }
+
+    private static OAuth2TokenValidatorResult valid(boolean condition) {
+        return condition ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token"));
+    }
+
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    SecurityFilterChain security(HttpSecurity http, IdentityPolicy policy,
+            @Qualifier("applicationJwtDecoder") JwtDecoder decoder) throws Exception {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(jwt -> List.of(
                 new SimpleGrantedAuthority("ROLE_" + policy.role(jwt))));
@@ -41,11 +101,11 @@ public class SecurityConfig {
                 .cors(cors -> {})
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/actuator/health", "/api/auth/**").permitAll()
                         .requestMatchers("/api/me").hasAnyRole("STUDENT", "EMPLOYEE")
                         .requestMatchers("/api/**").hasRole("EMPLOYEE")
                         .anyRequest().denyAll())
-                .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(converter)))
+                .oauth2ResourceServer(o -> o.jwt(j -> j.decoder(decoder).jwtAuthenticationConverter(converter)))
                 .build();
     }
 

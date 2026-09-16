@@ -25,8 +25,9 @@ public class IdentityController {
         String role = policy.role(jwt);
         UUID studentId = null;
         if (role.equals("STUDENT")) {
-            String issuer = jwt.getIssuer().toString();
-            Student student = students.findByOidcIssuerAndOidcSubject(issuer, jwt.getSubject())
+            String issuer = jwt.getClaimAsString("identity_issuer");
+            String subject = jwt.getClaimAsString("identity_subject");
+            Student student = students.findByOidcIssuerAndOidcSubject(issuer, subject)
                     .orElseGet(() -> {
                         Student match = students.findByInstitutionalEmailIgnoreCase(jwt.getClaimAsString("email"))
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -35,12 +36,12 @@ public class IdentityController {
                             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                                     "Student je već povezan sa drugim nalogom.");
                         }
-                        match.linkIdentity(issuer, jwt.getSubject());
+                        match.linkIdentity(issuer, subject);
                         return students.saveAndFlush(match);
                     });
             studentId = student.getId();
         }
-        return new Identity(jwt.getSubject(), jwt.getClaimAsString("email"), role, studentId);
+        return new Identity(jwt.getClaimAsString("identity_subject"), jwt.getClaimAsString("email"), role, studentId);
     }
 
     public record Identity(String subject, String email, String role, UUID studentId) {}

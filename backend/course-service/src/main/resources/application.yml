@@ -21,7 +21,7 @@ spring:
     enabled: true
 
 students:
-  email-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.org}
+  email-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.unibl.org}
 
 course-import:
   max-rows: 5000
@@ -98,9 +98,14 @@ management:
         include: health,info
 
 authentication:
-  issuer: ${OIDC_ISSUER:http://localhost:8080/realms/attendance-system}
-  jwk-set-uri: ${OIDC_JWK_SET_URI:http://localhost:8080/realms/attendance-system/protocol/openid-connect/certs}
+  app-issuer: https://attendance-system.local
   audience: course-service
-  student-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.org}
-  employee-domain: ${EMPLOYEE_EMAIL_DOMAIN:etf.org}
+  jwt-secret: ${APP_JWT_SECRET:local-development-secret-change-me-123456789}
+  token-lifetime-seconds: 1800
+  google-client-id: ${GOOGLE_CLIENT_ID:}
+  student-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.unibl.org}
   frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
+  test-employee-enabled: ${TEST_EMPLOYEE_ENABLED:true}
+  test-employee-username: ${TEST_EMPLOYEE_USERNAME:profesor}
+  test-employee-password: ${TEST_EMPLOYEE_PASSWORD:Profesor123!}
+  test-employee-email: ${TEST_EMPLOYEE_EMAIL:profesor@etf.unibl.org}
