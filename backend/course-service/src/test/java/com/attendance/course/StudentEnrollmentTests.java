@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties = "spring.datasource.url=${ENROLLMENT_TEST_DB_URL:jdbc:h2:mem:student_enrollment_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1}")
+@org.springframework.security.test.context.support.WithMockUser(roles = "EMPLOYEE")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class StudentEnrollmentTests {

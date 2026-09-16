@@ -1,7 +1,11 @@
 # Frontend
 
-Planirana React + TypeScript aplikacija sa Vite-om. Kod još nije generisan.
+React i TypeScript aplikacija sa Vite-om. Ekran omogućava OIDC prijavu, prikaz identiteta preko /api/me i odjavu.
 
-Prvi ekrani: početna stranica, OIDC prijava i predmeti. Zatim kreiranje sesije, prikaz i skeniranje QR koda i dashboard.
+Docker: docker compose up --build iz glavnog foldera. Adresa: http://localhost:5173.
 
-Interfejs mora biti responzivan. Za kameru na telefonu planirati HTTPS i mrežni pristup aplikaciji. Prije implementacije dogovoriti API ugovore sa backendom.
+Razvoj iz ovog foldera: npm ci, zatim npm run dev.
+
+Provjera TypeScripta i izgradnja: npm run build.
+
+Konfiguracija: .env.example i ../docs/authentication.md.

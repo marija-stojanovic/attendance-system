@@ -6,12 +6,12 @@ Planirani stack: Spring Boot, React + TypeScript, PostgreSQL i Docker Compose.
 
 ## Trenutno stanje
 
-Početna struktura i dokumentacija su postavljene. `course-service` je povezan sa PostgreSQL bazom i podržava dodavanje i pregled predmeta, upravljanje studentima, generisanje institucionalnih emailova, izvođenja predmeta, grupe, upise i automatsko određivanje grupa prve godine. Funkcionalnosti su pokrivene validacijom i testovima. Ostale komponente još nisu napravljene.
+Početna struktura i dokumentacija su postavljene. `course-service` je povezan sa PostgreSQL bazom i podržava dodavanje i pregled predmeta, upravljanje studentima, generisanje institucionalnih emailova, izvođenja predmeta, grupe, upise i automatsko određivanje grupa prve godine. Funkcionalnosti su pokrivene validacijom i testovima. Dodata je OIDC prijava preko Keycloaka, provjera uloga na backendu i početni React ekran za prijavu i odjavu.
 
 ## Struktura
 
 - `backend/`: planirani Spring Boot servisi.
-- `frontend/`: planirana React aplikacija.
+- `frontend/`: React aplikacija za prijavu i prikaz naloga.
 - `infra/`: buduća konfiguracija infrastrukture.
 - `docs/`: arhitektura, analiza ulaza i plan razvoja.
 - `test-files/`: uputstvo za lokalne testne podatke.
@@ -23,6 +23,8 @@ Početna struktura i dokumentacija su postavljene. `course-service` je povezan s
 - [Zajednički rad](CONTRIBUTING.md)
 - [Studenti i upisi](docs/students-and-enrollments.md)
 - [Automatsko određivanje grupa](docs/group-assignment.md)
+
+- [Prijava i prava pristupa](docs/authentication.md)
 
 ## Razvojno okruženje
 
@@ -48,7 +50,7 @@ Iz glavnog foldera projekta pokrenuti:
 docker compose up --build
 ```
 
-Kada se aplikacija pokrene, njeno stanje se može provjeriti na `http://localhost:8081/actuator/health`.
+Kada se aplikacija pokrene, njeno stanje se može provjeriti na `http://localhost:8081/actuator/health`. React aplikacija je dostupna na `http://localhost:5173`. Keycloak administracija je dostupna na `http://localhost:8080`.
 
 Za zaustavljanje koristiti:
 

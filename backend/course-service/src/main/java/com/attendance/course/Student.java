@@ -5,7 +5,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "students")
+@Table(name = "students", uniqueConstraints = @UniqueConstraint(
+        name = "uq_student_identity", columnNames = {"oidc_issuer", "oidc_subject"}))
 public class Student {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -22,6 +23,18 @@ public class Student {
 
     @Column(name = "institutional_email", unique = true, length = 255)
     private String institutionalEmail;
+
+    @Column(name = "oidc_issuer")
+    private String oidcIssuer;
+
+    @Column(name = "oidc_subject")
+    private String oidcSubject;
+
+    public String getOidcSubject() { return oidcSubject; }
+    public void linkIdentity(String issuer, String subject) {
+        this.oidcIssuer = issuer;
+        this.oidcSubject = subject;
+    }
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
