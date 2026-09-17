@@ -51,6 +51,20 @@ public class TeachingSession {
         createdAt = Instant.now();
     }
 
+    void update(TeachingGroup group, LocalDate date, LocalTime startTime) {
+        this.group = group;
+        this.date = date;
+        this.startTime = startTime;
+    }
+
+    void activate() {
+        status = SessionStatus.ACTIVE;
+    }
+
+    void close() {
+        status = SessionStatus.CLOSED;
+    }
+
     public UUID getId() {
         return id;
     }
