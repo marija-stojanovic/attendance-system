@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
-type Props = { apiUrl: string; token: string };
+type Props = { apiUrl: string; token: string; refreshKey?: number };
 type Course = { id: string; code: string; name: string; createdAt: string };
 type Offering = {
   id: string;
@@ -20,7 +20,7 @@ const activityNames: Record<string, string> = {
   LABORATORY_EXERCISE: 'Laboratorijske vježbe'
 };
 
-export function CourseManagementPanel({ apiUrl, token }: Props) {
+export function CourseManagementPanel({ apiUrl, token, refreshKey = 0 }: Props) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [offerings, setOfferings] = useState<Offering[]>([]);
@@ -77,7 +77,7 @@ export function CourseManagementPanel({ apiUrl, token }: Props) {
     } catch (e) { setError(e instanceof Error ? e.message : 'Predmeti nisu dostupni.'); }
   }
 
-  useEffect(() => { void loadCourses(); }, [token]);
+  useEffect(() => { void loadCourses(); }, [token, refreshKey]);
 
   useEffect(() => {
     setSelectedOfferingId('');

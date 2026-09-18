@@ -17,12 +17,14 @@ public class ImportCommitController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> commit(@RequestParam("file") MultipartFile file, @RequestParam String academicYear,
+    public ResponseEntity<?> commit(@RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) String academicYear,
             @RequestParam(defaultValue = "etf") String layout, @RequestParam(required = false) String delimiter) {
         ImportPreview preview = previewService.preview(file, layout, delimiter);
         if (!preview.valid()) {
             return ResponseEntity.unprocessableEntity().body(preview);
         }
-        return ResponseEntity.ok(commitService.commit(preview, academicYear));
+        String year = preview.metadata().academicYear() == null ? academicYear : preview.metadata().academicYear();
+        return ResponseEntity.ok(commitService.commit(preview, year));
     }
 }
