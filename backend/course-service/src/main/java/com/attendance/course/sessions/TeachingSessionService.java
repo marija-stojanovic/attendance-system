@@ -16,12 +16,14 @@ public class TeachingSessionService {
     private final TeachingSessionRepository sessions;
     private final CourseRepository courses;
     private final TeachingGroupRepository groups;
+    private final SessionQrService qr;
 
     public TeachingSessionService(TeachingSessionRepository sessions, CourseRepository courses,
-            TeachingGroupRepository groups) {
+            TeachingGroupRepository groups, SessionQrService qr) {
         this.sessions = sessions;
         this.courses = courses;
         this.groups = groups;
+        this.qr = qr;
     }
 
     @Transactional
@@ -55,7 +57,8 @@ public class TeachingSessionService {
     public SessionResponse activate(UUID id) {
         TeachingSession session = requireForUpdate(id);
         requireStatus(session, SessionStatus.CREATED, "Samo kreirana sesija može se aktivirati.");
-        session.activate();
+        session.activate(qr.now());
+        qr.generate(session);
         return SessionResponse.from(session);
     }
 

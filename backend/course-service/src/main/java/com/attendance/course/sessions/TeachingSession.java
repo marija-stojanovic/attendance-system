@@ -37,6 +37,9 @@ public class TeachingSession {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "qr_started_at")
+    private Instant qrStartedAt;
+
     protected TeachingSession() {
     }
 
@@ -57,8 +60,9 @@ public class TeachingSession {
         this.startTime = startTime;
     }
 
-    void activate() {
+    void activate(Instant now) {
         status = SessionStatus.ACTIVE;
+        qrStartedAt = now.truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
     }
 
     void close() {
@@ -95,5 +99,9 @@ public class TeachingSession {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getQrStartedAt() {
+        return qrStartedAt;
     }
 }
