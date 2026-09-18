@@ -10,6 +10,8 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -55,12 +57,14 @@ public class ImportParser {
         if (activity == null) {
             errors.add(new ImportPreview.RowError(sourceRow, "activityType", "Oblik nastave nije prepoznat."));
         }
-        ImportPreview.Metadata result = new ImportPreview.Metadata(metadata.get(ImportField.COURSE_NAME),
+        String academicYear = academicYear(table, studentHeader.row(), errors);
+        ImportPreview.Metadata result = new ImportPreview.Metadata(academicYear, metadata.get(ImportField.COURSE_NAME),
                 metadata.get(ImportField.COURSE_CODE), metadata.get(ImportField.STUDY_PROGRAM),
                 metadata.get(ImportField.STUDY_TYPE), year, semester, activity, metadata.get(ImportField.GROUP_NUMBER));
         List<ImportPreview.StudentRow> students = new ArrayList<>();
         List<ImportPreview.RowWarning> warnings = new ArrayList<>();
         Map<String, Integer> indexes = new HashMap<>();
+        Map<String, Integer> emailNumbers = new HashMap<>();
         int start = studentHeader.row() + 1;
         for (var merge : table.merges()) {
             if (merge.firstRow() == studentHeader.row()
@@ -87,9 +91,12 @@ public class ImportParser {
             validator.validate(student).stream().sorted(java.util.Comparator.comparing(v -> v.getPropertyPath().toString()))
                     .forEach(v -> errors.add(new ImportPreview.RowError(row, v.getPropertyPath().toString(), v.getMessage())));
             required(data, ImportField.STATUS, 30, row, errors);
+            String email = "";
             if (!student.firstName().isBlank() && !student.lastName().isBlank()) {
                 try {
-                    emails.generate(student.firstName(), student.lastName(), 1);
+                    String base = emails.generate(student.firstName(), student.lastName(), 1);
+                    int number = emailNumbers.merge(base, 1, Integer::sum);
+                    email = emails.generate(student.firstName(), student.lastName(), number);
                 } catch (ResponseStatusException exception) {
                     errors.add(new ImportPreview.RowError(row, "name", exception.getReason()));
                 }
@@ -105,14 +112,37 @@ public class ImportParser {
             if (assignment.note() != null) {
                 warnings.add(new ImportPreview.RowWarning(row, "groupNumber", assignment.note()));
             }
-            students.add(new ImportPreview.StudentRow(row, student.lastName(), student.firstName(),
-                    student.indexNumber(), data.get(ImportField.STATUS), assignment.groupNumber()));
+            students.add(new ImportPreview.StudentRow(row, students.size() + 1, student.lastName(), student.firstName(),
+                    student.indexNumber(), data.get(ImportField.STATUS), email, assignment.groupNumber()));
         }
         if (students.isEmpty()) {
             errors.add(new ImportPreview.RowError(null, "students", "Fajl ne sadrži studente."));
         }
         return errors.isEmpty() ? new ImportPreview(true, result, List.copyOf(students), List.of(), List.copyOf(warnings))
                 : invalid(errors);
+    }
+
+    private String academicYear(ImportTable table, int beforeRow, List<ImportPreview.RowError> errors) {
+        Pattern range = Pattern.compile("(?<!\\d)(20\\d{2})\\s*[/\\-]\\s*(20\\d{2})(?!\\d)");
+        Pattern single = Pattern.compile("(?<!\\d)(20\\d{2})(?!\\d)");
+        for (int row = 0; row < beforeRow; row++) {
+            for (var cell : table.rows().get(row).cells().values()) {
+                String text = cell.text();
+                Matcher years = range.matcher(text);
+                if (years.find() && Integer.parseInt(years.group(2)) == Integer.parseInt(years.group(1)) + 1) {
+                    return years.group(1) + "/" + years.group(2);
+                }
+                String normalized = ImportField.normalize(text);
+                if (normalized.contains("godinu") || normalized.contains("godina") || normalized.contains("year")) {
+                    Matcher year = single.matcher(text);
+                    if (year.find()) {
+                        int first = Integer.parseInt(year.group(1));
+                        return first + "/" + (first + 1);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private Header findHeader(ImportTable table, ImportProperties.Layout layout, List<ImportField> fields,

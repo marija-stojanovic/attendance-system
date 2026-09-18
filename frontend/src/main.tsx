@@ -4,6 +4,7 @@ import { GoogleLogin, GoogleOAuthProvider, googleLogout } from '@react-oauth/goo
 import './style.css';
 import { SessionQrPanel } from './SessionQrPanel';
 import { CourseManagementPanel } from './CourseManagementPanel';
+import { CourseImportPanel } from './CourseImportPanel';
 
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -23,6 +24,7 @@ function App() {
   const [indexNumber, setIndexNumber] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [courseRefresh, setCourseRefresh] = useState(0);
 
   async function loadIdentity(accessToken: string) {
     setLoading(true);
@@ -125,7 +127,8 @@ function App() {
       <button disabled={loading} onClick={() => void loadIdentity(token)}>Provjeri nalog</button>
       <button onClick={logout}>Odjavi se</button>
       {identity?.role === 'EMPLOYEE' && <>
-        <CourseManagementPanel apiUrl={apiUrl} token={token} />
+        <CourseImportPanel apiUrl={apiUrl} token={token} onImported={() => setCourseRefresh(value => value + 1)} />
+        <CourseManagementPanel apiUrl={apiUrl} token={token} refreshKey={courseRefresh} />
         <SessionQrPanel apiUrl={apiUrl} token={token} />
       </>}
     </> : registration ? <section>
