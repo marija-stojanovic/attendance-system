@@ -23,6 +23,9 @@ spring:
 students:
   email-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.unibl.org}
 
+session-qr:
+  rotation-seconds: ${QR_ROTATION_SECONDS:30}
+
 course-import:
   max-rows: 5000
   max-columns: 64
