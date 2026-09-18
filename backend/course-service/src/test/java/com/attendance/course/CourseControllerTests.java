@@ -131,6 +131,50 @@ class CourseControllerTests {
     }
 
     @Test
+    void updatesCourse() throws Exception {
+        Course course = courseRepository.saveAndFlush(new Course("CS101", "Programiranje"));
+        mockMvc.perform(put("/api/courses/{id}", course.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"CS102\",\"name\":\"Objektno programiranje\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("code").value("CS102"))
+                .andExpect(jsonPath("name").value("Objektno programiranje"));
+        Course updated = courseRepository.findById(course.getId()).orElseThrow();
+        assertThat(updated.getCode()).isEqualTo("CS102");
+        assertThat(updated.getName()).isEqualTo("Objektno programiranje");
+    }
+
+    @Test
+    void rejectsDuplicateCodeOnUpdate() throws Exception {
+        courseRepository.saveAndFlush(new Course("CS101", "Programiranje"));
+        Course course = courseRepository.saveAndFlush(new Course("CS102", "Baze podataka"));
+        mockMvc.perform(put("/api/courses/{id}", course.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"CS101\",\"name\":\"Baze podataka\"}"))
+                .andExpect(status().isConflict());
+        assertThat(courseRepository.findById(course.getId()).orElseThrow().getCode()).isEqualTo("CS102");
+    }
+
+    @Test
+    void rejectsInvalidCourseUpdate() throws Exception {
+        Course course = courseRepository.saveAndFlush(new Course("CS101", "Programiranje"));
+        mockMvc.perform(put("/api/courses/{id}", course.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"   \",\"name\":\"Programiranje\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("errors.code").isNotEmpty());
+    }
+
+    @Test
+    void returnsNotFoundOnUpdate() throws Exception {
+        mockMvc.perform(put("/api/courses/{id}", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"CS101\",\"name\":\"Programiranje\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("detail").value("Predmet nije pronađen."));
+    }
+
+    @Test
     void rejectsInvalidId() throws Exception {
         mockMvc.perform(get("/api/courses/not-a-uuid")).andExpect(status().isBadRequest());
     }

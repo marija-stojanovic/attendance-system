@@ -38,4 +38,15 @@ public class CourseService {
                 .map(CourseResponse::from)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Predmet nije pronađen."));
     }
+
+    @Transactional
+    public CourseResponse update(UUID id, CreateCourseRequest request) {
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Predmet nije pronađen."));
+        if (courseRepository.existsByCodeAndIdNot(request.code(), id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Predmet sa ovom šifrom već postoji.");
+        }
+        course.update(request.code(), request.name());
+        return CourseResponse.from(courseRepository.saveAndFlush(course));
+    }
 }

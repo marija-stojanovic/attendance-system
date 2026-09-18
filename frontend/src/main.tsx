@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { GoogleLogin, GoogleOAuthProvider, googleLogout } from '@react-oauth/google';
 import './style.css';
 import { SessionQrPanel } from './SessionQrPanel';
+import { CourseManagementPanel } from './CourseManagementPanel';
 
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -123,7 +124,10 @@ function App() {
       </section>}
       <button disabled={loading} onClick={() => void loadIdentity(token)}>Provjeri nalog</button>
       <button onClick={logout}>Odjavi se</button>
-      {identity?.role === 'EMPLOYEE' && <SessionQrPanel apiUrl={apiUrl} token={token} />}
+      {identity?.role === 'EMPLOYEE' && <>
+        <CourseManagementPanel apiUrl={apiUrl} token={token} />
+        <SessionQrPanel apiUrl={apiUrl} token={token} />
+      </>}
     </> : registration ? <section>
       <h2>Završetak registracije</h2>
       <p>Unesite podatke koji nedostaju za studentsku evidenciju.</p>
