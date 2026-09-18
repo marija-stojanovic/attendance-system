@@ -27,7 +27,7 @@ select { padding: 11px; border: 1px solid #9badbd; border-radius: 6px; font: inh
 button.item { display: grid; gap: 3px; width: 100%; margin: 0; text-align: left; background: white; color: #172d43; border: 1px solid #b8c7d4; }
 button.item:hover, button.item.active { border-color: #215b94; background: #e3effa; }
 button.item span { font-size: 14px; font-weight: 400; }
-.editor, .groups-editor { margin: 16px 0; padding: 16px; border: 1px solid #c7d5e0; border-radius: 8px; background: white; }
+.editor, .groups-editor, .employees-editor { margin: 16px 0; padding: 16px; border: 1px solid #c7d5e0; border-radius: 8px; background: white; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 button.secondary { background: #64798c; }
 .success { color: #176536; background: #e8f7ed; padding: 12px; }

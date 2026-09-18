@@ -12,6 +12,7 @@ type Offering = {
   semester: number;
 };
 type Group = { id: string; offeringId: string; activityType: string; groupNumber: string };
+type CourseEmployee = { id: string; employeeId: string; email: string; username: string; role: string };
 
 const activityNames: Record<string, string> = {
   LECTURE: 'Predavanje',
@@ -25,6 +26,7 @@ export function CourseManagementPanel({ apiUrl, token }: Props) {
   const [offerings, setOfferings] = useState<Offering[]>([]);
   const [selectedOfferingId, setSelectedOfferingId] = useState('');
   const [groups, setGroups] = useState<Group[]>([]);
+  const [employees, setEmployees] = useState<CourseEmployee[]>([]);
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [editing, setEditing] = useState(false);
@@ -37,6 +39,8 @@ export function CourseManagementPanel({ apiUrl, token }: Props) {
   const [semester, setSemester] = useState('1');
   const [activityType, setActivityType] = useState('LECTURE');
   const [groupNumber, setGroupNumber] = useState('');
+  const [employeeEmail, setEmployeeEmail] = useState('');
+  const [employeeRole, setEmployeeRole] = useState('ASSISTANT');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -79,10 +83,15 @@ export function CourseManagementPanel({ apiUrl, token }: Props) {
     setSelectedOfferingId('');
     setGroups([]);
     setOfferings([]);
+    setEmployees([]);
     if (!selectedCourseId) return;
-    request<Offering[]>('/api/courses/' + selectedCourseId + '/offerings')
-      .then(setOfferings)
-      .catch(e => setError(e instanceof Error ? e.message : 'Akademske godine nisu dostupne.'));
+    Promise.all([
+      request<Offering[]>('/api/courses/' + selectedCourseId + '/offerings'),
+      request<CourseEmployee[]>('/api/courses/' + selectedCourseId + '/employees')
+    ]).then(([loadedOfferings, loadedEmployees]) => {
+      setOfferings(loadedOfferings);
+      setEmployees(loadedEmployees);
+    }).catch(e => setError(e instanceof Error ? e.message : 'Detalji predmeta nisu dostupni.'));
   }, [selectedCourseId]);
 
   useEffect(() => {
@@ -173,6 +182,23 @@ export function CourseManagementPanel({ apiUrl, token }: Props) {
     finally { setLoading(false); }
   }
 
+  async function assignEmployee(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedCourse) return;
+    setLoading(true);
+    clearNotices();
+    try {
+      const saved = await request<CourseEmployee>('/api/courses/' + selectedCourse.id + '/employees', {
+        method: 'POST',
+        body: JSON.stringify({ email: employeeEmail, role: employeeRole })
+      });
+      setEmployees(current => [...current, saved].sort((a, b) => a.email.localeCompare(b.email)));
+      setEmployeeEmail('');
+      setMessage('Zaposleni je povezan sa predmetom.');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Zaposleni nije povezan sa predmetom.'); }
+    finally { setLoading(false); }
+  }
+
   return <section className="management-panel">
     <div className="panel-heading">
       <div><p className="label">NASTAVA</p><h2>Upravljanje predmetima</h2></div>
@@ -198,6 +224,15 @@ export function CourseManagementPanel({ apiUrl, token }: Props) {
       <div>
         {!selectedCourse ? <p>Izaberite predmet za pregled detalja.</p> : <>
           <div className="detail-heading"><div><h3>{selectedCourse.name}</h3><p>{selectedCourse.code}</p></div><button className="secondary" type="button" onClick={openEditCourse}>Izmijeni</button></div>
+          <div className="employees-editor">
+            <h3>Nastavnici i asistenti</h3>
+            <ul className="group-list">{employees.map(employee => <li key={employee.id}><span><strong>{employee.username}</strong><br />{employee.email}</span><span>{employee.role === 'TEACHER' ? 'Nastavnik' : 'Asistent'}</span></li>)}</ul>
+            <form onSubmit={assignEmployee}>
+              <label>E-mail zaposlenog<input type="email" value={employeeEmail} onChange={event => setEmployeeEmail(event.target.value)} required /></label>
+              <label>Uloga<select value={employeeRole} onChange={event => setEmployeeRole(event.target.value)}><option value="TEACHER">Nastavnik</option><option value="ASSISTANT">Asistent</option></select></label>
+              <button disabled={loading} type="submit">Poveži zaposlenog</button>
+            </form>
+          </div>
           <div className="panel-heading"><h3>Akademske godine</h3><button type="button" onClick={() => { setShowOfferingForm(true); clearNotices(); }}>Dodaj izvođenje</button></div>
           {showOfferingForm && <form className="editor" onSubmit={saveOffering}>
             <label>Akademska godina<input value={academicYear} onChange={event => setAcademicYear(event.target.value)} required pattern="[0-9]{4}/[0-9]{4}" placeholder="2026/2027" /></label>

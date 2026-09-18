@@ -1,5 +1,7 @@
 package com.attendance.course;
 
+import com.attendance.course.security.LocalUser;
+import com.attendance.course.security.LocalUserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import java.util.UUID;
@@ -13,12 +15,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 @SpringBootTest
 @org.springframework.security.test.context.support.WithMockUser(roles = "EMPLOYEE")
@@ -35,9 +39,17 @@ class CourseControllerTests {
     @Autowired
     private CourseRepository courseRepository;
 
+    @Autowired
+    private CourseEmployeeRepository courseEmployeeRepository;
+
+    @Autowired
+    private LocalUserRepository localUserRepository;
+
     @BeforeEach
     void setUp() {
+        courseEmployeeRepository.deleteAll();
         courseRepository.deleteAll();
+        localUserRepository.deleteAll();
     }
 
     @Test
@@ -172,6 +184,53 @@ class CourseControllerTests {
                         .content("{\"code\":\"CS101\",\"name\":\"Programiranje\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("detail").value("Predmet nije pronađen."));
+    }
+
+    @Test
+    void createsCourseForAuthenticatedEmployeeAndReturnsOnlyTheirCourses() throws Exception {
+        LocalUser first = localUserRepository.save(new LocalUser(
+                "profesor", "password", "profesor@etf.unibl.org", "EMPLOYEE"));
+        LocalUser second = localUserRepository.save(new LocalUser(
+                "asistent", "password", "asistent@etf.unibl.org", "EMPLOYEE"));
+        mockMvc.perform(post("/api/courses")
+                        .with(jwt().jwt(token -> token.subject(first.getId().toString())
+                                .claim("role", "EMPLOYEE").claim("email", first.getEmail()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"ORT\",\"name\":\"Osnove računarske tehnike\"}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(get("/api/courses")
+                        .with(jwt().jwt(token -> token.subject(first.getId().toString())
+                                .claim("role", "EMPLOYEE").claim("email", first.getEmail()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+        mockMvc.perform(get("/api/courses")
+                        .with(jwt().jwt(token -> token.subject(second.getId().toString())
+                                .claim("role", "EMPLOYEE").claim("email", second.getEmail()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isOk()).andExpect(content().json("[]"));
+    }
+
+    @Test
+    void assignsEmployeeToCourse() throws Exception {
+        LocalUser teacher = localUserRepository.save(new LocalUser(
+                "profesor", "password", "profesor@etf.unibl.org", "EMPLOYEE"));
+        LocalUser assistant = localUserRepository.save(new LocalUser(
+                "asistent", "password", "asistent@etf.unibl.org", "EMPLOYEE"));
+        Course course = courseRepository.saveAndFlush(new Course("ORT", "Osnove računarske tehnike"));
+        courseEmployeeRepository.saveAndFlush(new CourseEmployee(course, teacher, CourseEmployeeRole.TEACHER));
+        var authentication = jwt().jwt(token -> token.subject(teacher.getId().toString())
+                .claim("role", "EMPLOYEE").claim("email", teacher.getEmail()))
+                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"));
+        mockMvc.perform(post("/api/courses/{id}/employees", course.getId()).with(authentication)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"asistent@etf.unibl.org\",\"role\":\"ASSISTANT\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("email").value(assistant.getEmail()))
+                .andExpect(jsonPath("role").value("ASSISTANT"));
+        mockMvc.perform(get("/api/courses/{id}/employees", course.getId()).with(authentication))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test
