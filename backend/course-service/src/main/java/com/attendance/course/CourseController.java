@@ -32,4 +32,9 @@ public class CourseController {
     public CourseResponse findById(@PathVariable UUID id) {
         return courseService.findById(id);
     }
+
+    @PutMapping("/{id}")
+    public CourseResponse update(@PathVariable UUID id, @Valid @RequestBody CreateCourseRequest request) {
+        return courseService.update(id, request);
+    }
 }

@@ -29,6 +29,11 @@ public class Course {
         this.name = name;
     }
 
+    public void update(String code, String name) {
+        this.code = code;
+        this.name = name;
+    }
+
     @PrePersist
     void beforeInsert() {
         createdAt = Instant.now();
