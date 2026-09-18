@@ -6,4 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface LocalUserRepository extends JpaRepository<LocalUser, UUID> {
     Optional<LocalUser> findByUsernameIgnoreCase(String username);
+    Optional<LocalUser> findByEmailIgnoreCase(String email);
 }
