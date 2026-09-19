@@ -31,6 +31,12 @@ public class CourseOffering {
     @Column(nullable = false)
     private short semester;
 
+    @Column(name = "auditory_selection_enabled", nullable = false)
+    private boolean auditorySelectionEnabled;
+
+    @Column(name = "laboratory_selection_enabled", nullable = false)
+    private boolean laboratorySelectionEnabled;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -56,4 +62,18 @@ public class CourseOffering {
     public String getStudyType() { return studyType; }
     public short getYearOfStudy() { return yearOfStudy; }
     public short getSemester() { return semester; }
+    public boolean isSelectionEnabled(ActivityType activityType) {
+        return switch (activityType) {
+            case AUDITORY_EXERCISE -> auditorySelectionEnabled;
+            case LABORATORY_EXERCISE -> laboratorySelectionEnabled;
+            case LECTURE -> false;
+        };
+    }
+    public void setSelectionEnabled(ActivityType activityType, boolean enabled) {
+        switch (activityType) {
+            case AUDITORY_EXERCISE -> auditorySelectionEnabled = enabled;
+            case LABORATORY_EXERCISE -> laboratorySelectionEnabled = enabled;
+            case LECTURE -> throw new IllegalArgumentException("Predavanja nemaju izbor grupa.");
+        }
+    }
 }

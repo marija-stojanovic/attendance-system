@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.UUID;
 import com.attendance.course.security.LocalUser;
 import com.attendance.course.security.LocalUserRepository;
+import com.attendance.course.sessions.TeachingSessionRepository;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,12 +18,21 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final CourseEmployeeRepository courseEmployees;
     private final LocalUserRepository localUsers;
+    private final CourseOfferingRepository offerings;
+    private final TeachingGroupRepository groups;
+    private final EnrollmentRepository enrollments;
+    private final TeachingSessionRepository sessions;
 
     public CourseService(CourseRepository courseRepository, CourseEmployeeRepository courseEmployees,
-            LocalUserRepository localUsers) {
+            LocalUserRepository localUsers, CourseOfferingRepository offerings, TeachingGroupRepository groups,
+            EnrollmentRepository enrollments, TeachingSessionRepository sessions) {
         this.courseRepository = courseRepository;
         this.courseEmployees = courseEmployees;
         this.localUsers = localUsers;
+        this.offerings = offerings;
+        this.groups = groups;
+        this.enrollments = enrollments;
+        this.sessions = sessions;
     }
 
     @Transactional
@@ -66,6 +76,31 @@ public class CourseService {
         }
         course.update(request.code(), request.name());
         return CourseResponse.from(courseRepository.saveAndFlush(course));
+    }
+
+    @Transactional
+    public void delete(UUID courseId, UUID employeeId) {
+        Course course = requireCourseAccess(courseId, employeeId);
+        if (!courseEmployees.existsByCourseIdAndEmployeeIdAndRole(courseId, employeeId,
+                CourseEmployeeRole.TEACHER)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Samo profesor povezan sa predmetom može obrisati predmet.");
+        }
+        List<Enrollment> courseEnrollments = enrollments
+                .findByOfferingCourseIdOrderByStudentLastNameAscStudentFirstNameAscStudentIndexNumberAsc(courseId);
+        enrollments.deleteAll(courseEnrollments);
+        enrollments.flush();
+
+        sessions.deleteAll(sessions.findByGroupOfferingCourseIdOrderByDateAscStartTimeAscIdAsc(courseId));
+        sessions.flush();
+        groups.deleteAll(groups.findByOfferingCourseId(courseId));
+        groups.flush();
+        offerings.deleteAll(offerings.findByCourseIdOrderByAcademicYearDescStudyProgramAscStudyTypeAsc(courseId));
+        offerings.flush();
+        courseEmployees.deleteAll(courseEmployees.findByCourseId(courseId));
+        courseEmployees.flush();
+        courseRepository.delete(course);
+        courseRepository.flush();
     }
 
     public List<CourseResponse> findAll(UUID employeeId) {

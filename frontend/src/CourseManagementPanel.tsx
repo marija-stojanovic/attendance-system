@@ -11,10 +11,15 @@ type Offering = {
   yearOfStudy: number;
   semester: number;
 };
-type Group = { id: string; offeringId: string; activityType: string; groupNumber: string };
+type Group = { id: string; offeringId: string; activityType: string; groupNumber: string; capacity: number | null };
 type CourseEmployee = { id: string; email: string; username: string; role: string };
 type Student = { id: string; indexNumber: string; firstName: string; lastName: string; institutionalEmail: string };
 type Enrollment = { id: string; student: Student; status: string; groupIds: string[] };
+type ManagedGroup = { id: string; groupNumber: string; capacity: number; occupied: number };
+type GroupSettings = {
+  activityType: string; studentCount: number; configured: boolean; selectionEnabled: boolean; groups: ManagedGroup[];
+};
+type SettingsForm = { groupCount: number | ''; groupCapacity: number | ''; selectionEnabled: boolean };
 
 const activityNames: Record<string, string> = {
   LECTURE: 'Predavanja',
@@ -33,6 +38,12 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
+  const [groupSettings, setGroupSettings] = useState<GroupSettings[]>([]);
+  const [settingsForms, setSettingsForms] = useState<Record<string, SettingsForm>>({});
+  const [savingSettings, setSavingSettings] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [localRefresh, setLocalRefresh] = useState(0);
+  const [offeringRefresh, setOfferingRefresh] = useState(0);
   const [error, setError] = useState('');
 
   const selectedCourse = courses.find(course => course.id === selectedCourseId) || null;
@@ -58,15 +69,16 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
     });
   }, [enrollments, studentSearch, groupFilter]);
 
-  async function request<T>(path: string): Promise<T> {
+  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(apiUrl + path, {
-      headers: { Authorization: 'Bearer ' + token }
+      ...init,
+      headers: { Authorization: 'Bearer ' + token, ...(init.body ? { 'Content-Type': 'application/json' } : {}) }
     });
     if (!response.ok) {
       const problem = await response.json().catch(() => ({}));
       throw new Error(problem.detail || problem.message || 'Zahtjev nije uspio.');
     }
-    return response.json();
+    return response.status === 204 ? undefined as T : response.json();
   }
 
   useEffect(() => {
@@ -78,7 +90,7 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
         return result[0]?.id || '';
       });
     }).catch(e => setError(e instanceof Error ? e.message : 'Predmeti nisu dostupni.'));
-  }, [token, refreshKey, importedCourseId]);
+  }, [token, refreshKey, importedCourseId, localRefresh]);
 
   useEffect(() => {
     setOfferings([]);
@@ -86,6 +98,8 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
     setSelectedOfferingId('');
     setGroups([]);
     setEnrollments([]);
+    setGroupSettings([]);
+    setSettingsForms({});
     if (!selectedCourseId) return;
 
     Promise.all([
@@ -109,12 +123,59 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
 
     Promise.all([
       request<Group[]>('/api/offerings/' + selectedOfferingId + '/groups'),
-      request<Enrollment[]>('/api/offerings/' + selectedOfferingId + '/students')
-    ]).then(([loadedGroups, loadedEnrollments]) => {
+      request<Enrollment[]>('/api/offerings/' + selectedOfferingId + '/students'),
+      request<GroupSettings[]>('/api/offerings/' + selectedOfferingId + '/group-settings')
+    ]).then(([loadedGroups, loadedEnrollments, loadedSettings]) => {
       setGroups(loadedGroups);
       setEnrollments(loadedEnrollments);
+      setGroupSettings(loadedSettings);
+      setSettingsForms(Object.fromEntries(loadedSettings.map(setting => [setting.activityType, {
+        groupCount: setting.configured ? setting.groups.length : '',
+        groupCapacity: setting.configured ? Math.min(...setting.groups.map(group => group.capacity)) : '',
+        selectionEnabled: setting.selectionEnabled
+      }])));
     }).catch(e => setError(e instanceof Error ? e.message : 'Podaci izvođenja nisu dostupni.'));
-  }, [selectedOfferingId]);
+  }, [selectedOfferingId, offeringRefresh]);
+
+  async function saveGroupSettings(activityType: string) {
+    const form = settingsForms[activityType];
+    const existing = groupSettings.find(setting => setting.activityType === activityType);
+    if (!form) return;
+    const groupCount = Number(form.groupCount);
+    const groupCapacity = Number(form.groupCapacity);
+    if (!Number.isInteger(groupCount) || groupCount < 1 || !Number.isInteger(groupCapacity) || groupCapacity < 1) {
+      setError('Unesite broj grupa i kapacitet grupe.');
+      return;
+    }
+    if (existing && groupCount * groupCapacity < existing.studentCount) {
+      setError('Ukupan kapacitet grupa mora biti dovoljan za sve studente.');
+      return;
+    }
+    if (existing?.configured && !window.confirm('Ponovno formiranje grupa briše postojeće izbore studenata i termine za ove grupe. Nastaviti?')) return;
+    setSavingSettings(activityType);
+    setError('');
+    try {
+      await request('/api/offerings/' + selectedOfferingId + '/group-settings/' + activityType, {
+        method: 'PUT', body: JSON.stringify({ groupCount, groupCapacity, selectionEnabled: form.selectionEnabled })
+      });
+      setOfferingRefresh(value => value + 1);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Grupe nisu sačuvane.'); }
+    finally { setSavingSettings(''); }
+  }
+
+  async function deleteCourse() {
+    if (!selectedCourse) return;
+    const confirmed = window.confirm('Brisanjem predmeta biće trajno obrisana sva njegova izvođenja, grupe, termini i upisi na ovaj predmet. Studenti ostaju sačuvani u bazi i na drugim predmetima. Nastaviti?');
+    if (!confirmed) return;
+    setDeleting(true);
+    setError('');
+    try {
+      await request<void>('/api/courses/' + selectedCourse.id, { method: 'DELETE' });
+      setSelectedCourseId('');
+      setLocalRefresh(value => value + 1);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Predmet nije obrisan.'); }
+    finally { setDeleting(false); }
+  }
 
   function offeringDetails() {
     if (!selectedOffering) return null;
@@ -140,6 +201,29 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
           </div>}
         </div>)}
       </div>
+
+      {selectedOffering.yearOfStudy > 1 && <div className="group-management">
+        <h3>Formiranje grupa</h3>
+        <p>Unesite broj grupa i kapacitet jedne grupe za izabranu vrstu vježbi.</p>
+        <div className="group-settings-grid">{groupSettings.map(setting => {
+          const form = settingsForms[setting.activityType];
+          if (!form) return null;
+          return <div className="group-settings-card" key={setting.activityType}>
+            <h4>{activityNames[setting.activityType]}</h4>
+            <p>Studenata: {setting.studentCount}</p>
+            <label>Broj grupa<input type="number" min="1" value={form.groupCount}
+              onChange={event => setSettingsForms(current => ({ ...current, [setting.activityType]: { ...form, groupCount: event.target.value === '' ? '' : Number(event.target.value) } }))} /></label>
+            <label>Broj članova u grupi<input type="number" min="1" value={form.groupCapacity}
+              onChange={event => setSettingsForms(current => ({ ...current, [setting.activityType]: { ...form, groupCapacity: event.target.value === '' ? '' : Number(event.target.value) } }))} /></label>
+            <label className="checkbox-label"><input type="checkbox" checked={form.selectionEnabled}
+              onChange={event => setSettingsForms(current => ({ ...current, [setting.activityType]: { ...form, selectionEnabled: event.target.checked } }))} /> Omogući studentima da se učlane u grupe</label>
+            {setting.groups.length > 0 && <div className="capacity-list">{setting.groups.map(group =>
+              <span key={group.id}>{group.groupNumber}: {group.occupied}/{group.capacity}</span>)}</div>}
+            <button type="button" disabled={savingSettings === setting.activityType}
+              onClick={() => void saveGroupSettings(setting.activityType)}>Sačuvaj grupe</button>
+          </div>;
+        })}</div>
+      </div>}
 
       <div className="students-panel">
         <div className="panel-heading"><h3>Studenti ({enrollments.length})</h3><span>Prikazano: {visibleEnrollments.length}</span></div>
@@ -186,7 +270,9 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
       </div>
       <div>
         {!selectedCourse ? <p>Izaberite predmet za pregled.</p> : <>
-          <div className="course-title"><h3>{selectedCourse.name}</h3><p>{selectedCourse.code}</p></div>
+          <div className="course-title"><div><h3>{selectedCourse.name}</h3><p>{selectedCourse.code}</p></div>
+            <button className="danger-button" type="button" disabled={deleting} onClick={() => void deleteCourse()}>Obriši predmet</button>
+          </div>
           {employees.length > 0 && <div className="course-employees">
             <strong>Zaposleni na predmetu</strong>
             <span>{employees.map(employee => employee.email).join(', ')}</span>

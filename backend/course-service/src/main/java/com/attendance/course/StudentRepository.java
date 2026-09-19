@@ -8,6 +8,7 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     java.util.Optional<Student> findByInstitutionalEmailIgnoreCase(String email);
+    java.util.Optional<Student> findFirstByInstitutionalEmailIgnoreCase(String email);
     java.util.Optional<Student> findByIndexNumber(String indexNumber);
     boolean existsByIndexNumber(String indexNumber);
     boolean existsByInstitutionalEmail(String institutionalEmail);

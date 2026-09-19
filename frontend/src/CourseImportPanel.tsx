@@ -5,7 +5,12 @@ type ImportResult = {
   courseId: string; offeringId: string; groupsCreated: number; studentsCreated: number; studentsReused: number;
   enrollmentsCreated: number; enrollmentsReused: number; groupMembershipsAdded: number; warnings: ImportWarning[];
 };
-type Props = { apiUrl: string; token: string; onImported: (result: ImportResult) => void };
+type Props = {
+  apiUrl: string;
+  token: string;
+  onImported: (result: ImportResult) => void;
+  onPreviewChange: (previewing: boolean) => void;
+};
 type Metadata = { academicYear: string; courseName: string; courseCode: string; studyProgram: string; studyType: string; yearOfStudy: number; semester: number; activityType: string; groupNumber: string };
 type Student = {
   row: number; ordinalNumber: number; lastName: string; firstName: string; indexNumber: string;
@@ -18,7 +23,7 @@ const activityNames: Record<string, string> = {
   LECTURE: 'Predavanje', AUDITORY_EXERCISE: 'Auditorne vježbe', LABORATORY_EXERCISE: 'Laboratorijske vježbe'
 };
 
-export function CourseImportPanel({ apiUrl, token, onImported }: Props) {
+export function CourseImportPanel({ apiUrl, token, onImported, onPreviewChange }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,8 +46,12 @@ export function CourseImportPanel({ apiUrl, token, onImported }: Props) {
     try {
       const result = await send('/api/imports/preview') as Preview;
       setPreview(result);
+      onPreviewChange(true);
       if (!result.valid) setError('Fajl sadrži greške. Podaci nisu upisani.');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Fajl nije moguće obraditi.'); }
+    } catch (e) {
+      onPreviewChange(false);
+      setError(e instanceof Error ? e.message : 'Fajl nije moguće obraditi.');
+    }
     finally { setLoading(false); }
   }
 
@@ -53,6 +62,7 @@ export function CourseImportPanel({ apiUrl, token, onImported }: Props) {
       setResult(saved);
       setMessage('Predmet i studenti su uspješno sačuvani.');
       onImported(saved);
+      onPreviewChange(false);
     } catch (e) { setError(e instanceof Error ? e.message : 'Podaci nisu sačuvani.'); }
     finally { setLoading(false); }
   }
@@ -62,7 +72,7 @@ export function CourseImportPanel({ apiUrl, token, onImported }: Props) {
     <h2>Uvoz evidencione liste</h2>
     <p>Izaberite Excel ili CSV fajl fakulteta. Prije čuvanja možete provjeriti sve učitane podatke.</p>
     <form onSubmit={load}>
-      <label>Excel ili CSV fajl<input type="file" accept=".xlsx,.csv" onChange={event => { setFile(event.target.files?.[0] || null); setPreview(null); setMessage(''); setResult(null); }} required /></label>
+      <label>Excel ili CSV fajl<input type="file" accept=".xlsx,.csv" onChange={event => { setFile(event.target.files?.[0] || null); setPreview(null); setMessage(''); setResult(null); onPreviewChange(false); }} required /></label>
       <button type="submit" disabled={loading}>{loading ? 'Učitavanje…' : 'Učitaj fajl'}</button>
     </form>
     {error && <p className="error" role="alert">{error}</p>}
@@ -88,6 +98,7 @@ export function CourseImportPanel({ apiUrl, token, onImported }: Props) {
         <div><strong>Grupa</strong><span>{metadata.groupNumber}</span></div>
       </div>
       <h3>Studenti ({preview.students.length})</h3>
+      <p className="notice">Podaci ispod pripadaju izabranom fajlu. Upravljanje grupama biće dostupno nakon čuvanja.</p>
       <div className="table-scroll"><table><thead><tr><th>R. br.</th><th>Prezime i ime</th><th>Indeks</th><th>Status</th><th>E-mail</th>
         {metadata.yearOfStudy === 1 ? <><th>Auditorna grupa</th><th>Laboratorijska grupa</th></> : <th>Grupa</th>}
       </tr></thead>

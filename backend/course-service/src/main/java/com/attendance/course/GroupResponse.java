@@ -2,8 +2,9 @@ package com.attendance.course;
 
 import java.util.UUID;
 
-public record GroupResponse(UUID id, UUID offeringId, ActivityType activityType, String groupNumber) {
+public record GroupResponse(UUID id, UUID offeringId, ActivityType activityType, String groupNumber, Integer capacity) {
     public static GroupResponse from(TeachingGroup group) {
-        return new GroupResponse(group.getId(), group.getOffering().getId(), group.getActivityType(), group.getGroupNumber());
+        return new GroupResponse(group.getId(), group.getOffering().getId(), group.getActivityType(),
+                group.getGroupNumber(), group.getCapacity());
     }
 }

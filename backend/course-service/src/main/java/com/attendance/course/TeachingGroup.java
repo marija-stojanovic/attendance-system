@@ -22,17 +22,26 @@ public class TeachingGroup {
     @Column(name = "group_number", nullable = false, length = 20)
     private String groupNumber;
 
+    @Column
+    private Integer capacity;
+
     protected TeachingGroup() {
     }
 
     public TeachingGroup(CourseOffering offering, ActivityType activityType, String groupNumber) {
+        this(offering, activityType, groupNumber, null);
+    }
+
+    public TeachingGroup(CourseOffering offering, ActivityType activityType, String groupNumber, Integer capacity) {
         this.offering = offering;
         this.activityType = activityType;
         this.groupNumber = groupNumber;
+        this.capacity = capacity;
     }
 
     public UUID getId() { return id; }
     public CourseOffering getOffering() { return offering; }
     public ActivityType getActivityType() { return activityType; }
     public String getGroupNumber() { return groupNumber; }
+    public Integer getCapacity() { return capacity; }
 }

@@ -42,6 +42,12 @@ public class CourseController {
         return courseService.update(id, request);
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        courseService.delete(id, UUID.fromString(jwt.getSubject()));
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}/employees")
     public List<CourseEmployeeResponse> findEmployees(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         return courseService.findEmployees(id, UUID.fromString(jwt.getSubject()));
