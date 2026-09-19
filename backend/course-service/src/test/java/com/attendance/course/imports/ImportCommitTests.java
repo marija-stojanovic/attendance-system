@@ -97,6 +97,18 @@ class ImportCommitTests {
     }
 
     @Test
+    void reusesStudentWhenNameUsesDifferentScript() throws Exception {
+        students.saveAndFlush(new Student("TEST-002/2099", "Ana Marija", "Primjerić",
+                "ana-marija.primjeric@student.etf.unibl.org"));
+
+        JsonNode result = upload(ImportParserTests.CSV, "2026/2027");
+
+        assertThat(result.get("studentsCreated").asInt()).isEqualTo(1);
+        assertThat(result.get("studentsReused").asInt()).isEqualTo(1);
+        assertThat(students.count()).isEqualTo(2);
+    }
+
+    @Test
     void addsGroupWithoutRemovingExistingMembership() throws Exception {
         JsonNode first = upload(ImportParserTests.CSV, "2026/2027");
         JsonNode second = upload(ImportParserTests.CSV.replace(";вјежбе;1", ";лабораторијске вјежбе;2"), "2026/2027");

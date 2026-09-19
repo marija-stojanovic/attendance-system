@@ -20,8 +20,8 @@ public class StudentEmailGenerator {
     }
 
     public String generate(String firstName, String lastName, int number) {
-        String first = part(firstName);
-        String last = part(lastName);
+        String first = normalizeName(firstName);
+        String last = normalizeName(lastName);
         String suffix = number == 1 ? "" : "." + number;
         int available = 63 - suffix.length();
         int firstLength = Math.min(first.length(), available / 2);
@@ -32,7 +32,7 @@ public class StudentEmailGenerator {
         return first + "." + last + suffix + "@" + domain;
     }
 
-    private String part(String value) {
+    public String normalizeName(String value) {
         String lower = Normalizer.normalize(value, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
         String cyrillic = "абвгдђежзијклљмнњопрстћуфхцчџш";
         String[] latin = {"a", "b", "v", "g", "d", "dj", "e", "z", "z", "i", "j", "k", "l", "lj",

@@ -120,7 +120,8 @@ public class ImportCommitService {
                 }
                 student = students.saveAndFlush(new Student(row.indexNumber(), row.firstName(), row.lastName(), email));
                 createdStudents++;
-            } else if (!same(student.getFirstName(), row.firstName()) || !same(student.getLastName(), row.lastName())) {
+            } else if (!sameStudentName(student.getFirstName(), row.firstName())
+                    || !sameStudentName(student.getLastName(), row.lastName())) {
                 throw conflict("Red " + row.row() + ": broj indeksa postoji sa drugačijim imenom ili prezimenom.");
             }
             Enrollment enrollment = enrollments.findByStudentIdAndOfferingId(student.getId(), offering.getId()).orElse(null);
@@ -151,6 +152,10 @@ public class ImportCommitService {
     private boolean same(String first, String second) {
         return Normalizer.normalize(ImportField.clean(first), Normalizer.Form.NFC).toLowerCase(Locale.ROOT)
                 .equals(Normalizer.normalize(ImportField.clean(second), Normalizer.Form.NFC).toLowerCase(Locale.ROOT));
+    }
+
+    private boolean sameStudentName(String first, String second) {
+        return emails.normalizeName(first).equals(emails.normalizeName(second));
     }
 
     private ResponseStatusException conflict(String message) {
