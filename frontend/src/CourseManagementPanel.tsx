@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
-type Props = { apiUrl: string; token: string; refreshKey?: number };
+type Props = { apiUrl: string; token: string; refreshKey?: number; importedCourseId?: string; importedOfferingId?: string };
 type Course = { id: string; code: string; name: string; createdAt: string };
 type Offering = {
   id: string;
@@ -13,6 +13,8 @@ type Offering = {
 };
 type Group = { id: string; offeringId: string; activityType: string; groupNumber: string };
 type CourseEmployee = { id: string; employeeId: string; email: string; username: string; role: string };
+type Student = { id: string; indexNumber: string; firstName: string; lastName: string; institutionalEmail: string };
+type Enrollment = { id: string; student: Student; status: string; groupIds: string[] };
 
 const activityNames: Record<string, string> = {
   LECTURE: 'Predavanje',
@@ -20,13 +22,16 @@ const activityNames: Record<string, string> = {
   LABORATORY_EXERCISE: 'Laboratorijske vježbe'
 };
 
-export function CourseManagementPanel({ apiUrl, token, refreshKey = 0 }: Props) {
+export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedCourseId = '', importedOfferingId = '' }: Props) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [offerings, setOfferings] = useState<Offering[]>([]);
   const [selectedOfferingId, setSelectedOfferingId] = useState('');
   const [groups, setGroups] = useState<Group[]>([]);
   const [employees, setEmployees] = useState<CourseEmployee[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [editing, setEditing] = useState(false);
@@ -51,6 +56,18 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0 }: Props) 
     (result[offering.academicYear] ||= []).push(offering);
     return result;
   }, {}), [offerings]);
+  const groupNames = useMemo(() => new Map(groups.map(group => [group.id, group.groupNumber])), [groups]);
+  const visibleEnrollments = useMemo(() => {
+    const search = studentSearch.trim().toLocaleLowerCase();
+    return enrollments.filter(enrollment => {
+      const student = enrollment.student;
+      const matchesSearch = !search || `${student.firstName} ${student.lastName} ${student.indexNumber} ${student.institutionalEmail}`
+        .toLocaleLowerCase().includes(search);
+      const matchesGroup = !groupFilter || (groupFilter === 'without-group'
+        ? enrollment.groupIds.length === 0 : enrollment.groupIds.includes(groupFilter));
+      return matchesSearch && matchesGroup;
+    });
+  }, [enrollments, studentSearch, groupFilter]);
 
   async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const response = await fetch(apiUrl + path, {
@@ -69,21 +86,25 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0 }: Props) 
     return response.json();
   }
 
-  async function loadCourses() {
+  async function loadCourses(preferredCourseId = '') {
     try {
       const result = await request<Course[]>('/api/courses');
       setCourses(result);
+      if (preferredCourseId && result.some(course => course.id === preferredCourseId)) {
+        setSelectedCourseId(preferredCourseId);
+      }
       if (selectedCourseId && !result.some(course => course.id === selectedCourseId)) setSelectedCourseId('');
     } catch (e) { setError(e instanceof Error ? e.message : 'Predmeti nisu dostupni.'); }
   }
 
-  useEffect(() => { void loadCourses(); }, [token, refreshKey]);
+  useEffect(() => { void loadCourses(importedCourseId); }, [token, refreshKey]);
 
   useEffect(() => {
     setSelectedOfferingId('');
     setGroups([]);
     setOfferings([]);
     setEmployees([]);
+    setEnrollments([]);
     if (!selectedCourseId) return;
     Promise.all([
       request<Offering[]>('/api/courses/' + selectedCourseId + '/offerings'),
@@ -91,15 +112,26 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0 }: Props) 
     ]).then(([loadedOfferings, loadedEmployees]) => {
       setOfferings(loadedOfferings);
       setEmployees(loadedEmployees);
+      if (importedOfferingId && loadedOfferings.some(offering => offering.id === importedOfferingId)) {
+        setSelectedOfferingId(importedOfferingId);
+      }
     }).catch(e => setError(e instanceof Error ? e.message : 'Detalji predmeta nisu dostupni.'));
-  }, [selectedCourseId]);
+  }, [selectedCourseId, refreshKey]);
 
   useEffect(() => {
     setGroups([]);
+    setEnrollments([]);
+    setStudentSearch('');
+    setGroupFilter('');
     if (!selectedOfferingId) return;
-    request<Group[]>('/api/offerings/' + selectedOfferingId + '/groups')
-      .then(setGroups)
-      .catch(e => setError(e instanceof Error ? e.message : 'Grupe nisu dostupne.'));
+    Promise.all([
+      request<Group[]>('/api/offerings/' + selectedOfferingId + '/groups'),
+      request<Enrollment[]>('/api/offerings/' + selectedOfferingId + '/students')
+    ]).then(([loadedGroups, loadedEnrollments]) => {
+      setGroups(loadedGroups);
+      setEnrollments(loadedEnrollments);
+    })
+      .catch(e => setError(e instanceof Error ? e.message : 'Podaci izvođenja nisu dostupni.'));
   }, [selectedOfferingId]);
 
   function clearNotices() {
@@ -255,6 +287,27 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0 }: Props) 
               <label>Broj grupe<input value={groupNumber} onChange={event => setGroupNumber(event.target.value)} required maxLength={20} /></label>
               <button disabled={loading} type="submit">Dodaj grupu</button>
             </form>
+            <div className="students-panel">
+              <div className="panel-heading"><h3>Studenti ({enrollments.length})</h3><span>Prikazano: {visibleEnrollments.length}</span></div>
+              <div className="student-filters">
+                <label>Pretraga<input value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Ime, indeks ili e-mail" /></label>
+                <label>Grupa<select value={groupFilter} onChange={event => setGroupFilter(event.target.value)}>
+                  <option value="">Sve grupe</option>
+                  {groups.map(group => <option key={group.id} value={group.id}>{activityNames[group.activityType] || group.activityType} — {group.groupNumber}</option>)}
+                  <option value="without-group">Bez grupe</option>
+                </select></label>
+              </div>
+              {visibleEnrollments.length === 0 ? <p>Nema studenata za izabrane kriterijume.</p> : <div className="table-scroll"><table>
+                <thead><tr><th>Indeks</th><th>Prezime i ime</th><th>E-mail</th><th>Status</th><th>Grupa</th></tr></thead>
+                <tbody>{visibleEnrollments.map(enrollment => <tr key={enrollment.id}>
+                  <td>{enrollment.student.indexNumber}</td>
+                  <td>{enrollment.student.lastName} {enrollment.student.firstName}</td>
+                  <td>{enrollment.student.institutionalEmail}</td>
+                  <td>{enrollment.status}</td>
+                  <td>{enrollment.groupIds.map(id => groupNames.get(id)).filter(Boolean).join(', ') || 'Bez grupe'}</td>
+                </tr>)}</tbody>
+              </table></div>}
+            </div>
           </div>}
         </>}
       </div>
