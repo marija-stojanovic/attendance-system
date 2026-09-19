@@ -20,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -241,6 +242,74 @@ class ImportCommitTests {
                 .andExpect(jsonPath("$[0].groups[0].groupNumber").value("G1"))
                 .andExpect(jsonPath("$[0].groups[1].activityType").value("LABORATORY_EXERCISE"))
                 .andExpect(jsonPath("$[0].groups[1].groupNumber").value("L1"));
+    }
+
+    @Test
+    void configuresOlderYearGroupsAndAllowsStudentSelection() throws Exception {
+        StringBuilder input = new StringBuilder()
+                .append("Predmet;Šifra;Studijski program;Tip studija;Godina studija;Semestar;Oblik nastave;Grupa\n")
+                .append("Stariji predmet;STARIJI-1;Računarstvo;OSNOVNE;3;5;vježbe;1\n\n")
+                .append("Prezime;Ime;Indeks;Status\n");
+        for (int number = 1; number <= 45; number++) {
+            input.append("Prezime;Ime;TEST-")
+                    .append(String.format("%03d", number)).append("/2099;REDOVAN\n");
+        }
+        JsonNode imported = upload(input.toString(), "2026/2027");
+        String offeringId = imported.get("offeringId").asText();
+
+        mvc.perform(get("/api/offerings/" + offeringId + "/group-settings").with(employeeJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[1].studentCount").value(45))
+                .andExpect(jsonPath("$[1].configured").value(false));
+
+        String response = mvc.perform(put("/api/offerings/" + offeringId
+                        + "/group-settings/LABORATORY_EXERCISE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"groupCount\":3,\"groupCapacity\":20,\"selectionEnabled\":true}")
+                        .with(employeeJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("groups.length()").value(3))
+                .andExpect(jsonPath("groups[0].capacity").value(20))
+                .andExpect(jsonPath("groups[1].capacity").value(20))
+                .andExpect(jsonPath("groups[2].capacity").value(20))
+                .andReturn().getResponse().getContentAsString();
+        String firstGroupId = json.readTree(response).get("groups").get(0).get("id").asText();
+        String secondGroupId = json.readTree(response).get("groups").get(1).get("id").asText();
+
+        Student student = students.findByIndexNumber("TEST-001/2099").orElseThrow();
+        student.linkIdentity("https://accounts.google.com", "older-student");
+        students.saveAndFlush(student);
+        var studentToken = studentJwt("older-student", student.getInstitutionalEmail());
+        mvc.perform(post("/api/student/courses/" + offeringId + "/groups/" + firstGroupId).with(studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("currentGroupId").value(firstGroupId))
+                .andExpect(jsonPath("groups[0].occupied").value(1));
+        mvc.perform(post("/api/student/courses/" + offeringId + "/groups/" + secondGroupId).with(studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("currentGroupId").value(secondGroupId))
+                .andExpect(jsonPath("groups[0].occupied").value(0))
+                .andExpect(jsonPath("groups[1].occupied").value(1));
+    }
+
+    @Test
+    void deletesCourseAndKeepsStudentsInDatabase() throws Exception {
+        JsonNode imported = upload(ImportParserTests.CSV, "2026/2027");
+        Student student = students.findByIndexNumber("TEST-001/2099").orElseThrow();
+        student.linkIdentity("https://accounts.google.com", "deleted-student");
+        students.saveAndFlush(student);
+
+        mvc.perform(delete("/api/courses/" + imported.get("courseId").asText()).with(employeeJwt()))
+                .andExpect(status().isNoContent());
+
+        assertThat(courses.count()).isZero();
+        assertThat(offerings.count()).isZero();
+        assertThat(groups.count()).isZero();
+        assertThat(enrollments.count()).isZero();
+        assertThat(students.count()).isEqualTo(2);
+        mvc.perform(get("/api/student/courses").with(studentJwt("deleted-student",
+                        "jana.izmisljic@student.etf.unibl.org")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
     }
 
     @Test

@@ -28,6 +28,7 @@ function App() {
   const [courseRefresh, setCourseRefresh] = useState(0);
   const [importedCourseId, setImportedCourseId] = useState('');
   const [importedOfferingId, setImportedOfferingId] = useState('');
+  const [previewingImport, setPreviewingImport] = useState(false);
 
   async function loadIdentity(accessToken: string) {
     setLoading(true);
@@ -131,13 +132,13 @@ function App() {
       <button onClick={logout}>Odjavi se</button>
       {identity?.role === 'STUDENT' && <StudentCoursesPanel apiUrl={apiUrl} token={token} />}
       {identity?.role === 'EMPLOYEE' && <>
-        <CourseImportPanel apiUrl={apiUrl} token={token} onImported={result => {
+        <CourseImportPanel apiUrl={apiUrl} token={token} onPreviewChange={setPreviewingImport} onImported={result => {
           setImportedCourseId(result.courseId);
           setImportedOfferingId(result.offeringId);
           setCourseRefresh(value => value + 1);
         }} />
-        <CourseManagementPanel apiUrl={apiUrl} token={token} refreshKey={courseRefresh}
-          importedCourseId={importedCourseId} importedOfferingId={importedOfferingId} />
+        {!previewingImport && <CourseManagementPanel apiUrl={apiUrl} token={token} refreshKey={courseRefresh}
+          importedCourseId={importedCourseId} importedOfferingId={importedOfferingId} />}
         <SessionQrPanel apiUrl={apiUrl} token={token} />
       </>}
     </> : registration ? <section>

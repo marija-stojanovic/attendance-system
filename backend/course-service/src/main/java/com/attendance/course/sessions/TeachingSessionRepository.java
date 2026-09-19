@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface TeachingSessionRepository extends JpaRepository<TeachingSession, UUID> {
     List<TeachingSession> findByGroupOfferingCourseIdOrderByDateAscStartTimeAscIdAsc(UUID courseId);
+    List<TeachingSession> findByGroupIdIn(List<UUID> groupIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from TeachingSession s where s.id = :id")

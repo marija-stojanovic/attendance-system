@@ -8,7 +8,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface CourseEmployeeRepository extends JpaRepository<CourseEmployee, UUID> {
     boolean existsByCourseIdAndEmployeeId(UUID courseId, UUID employeeId);
+    boolean existsByCourseIdAndEmployeeIdAndRole(UUID courseId, UUID employeeId, CourseEmployeeRole role);
     List<CourseEmployee> findByCourseIdOrderByEmployeeEmail(UUID courseId);
+    List<CourseEmployee> findByCourseId(UUID courseId);
 
     @Query("select assignment.course from CourseEmployee assignment where assignment.employee.id = :employeeId order by assignment.course.code")
     List<Course> findCoursesByEmployeeId(@Param("employeeId") UUID employeeId);
