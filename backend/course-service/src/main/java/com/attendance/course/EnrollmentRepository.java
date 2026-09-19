@@ -20,6 +20,16 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
 
     List<Enrollment> findByGroupsIdOrderByStudentLastNameAscStudentFirstNameAscStudentIndexNumberAsc(UUID groupId);
 
+    @Query("""
+            select distinct e from Enrollment e
+            join fetch e.offering o
+            join fetch o.course
+            left join fetch e.groups
+            where e.student.id = :studentId
+            order by o.academicYear desc, o.course.name asc
+            """)
+    List<Enrollment> findCoursesForStudent(@Param("studentId") UUID studentId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from Enrollment e where e.id = :id")
     Optional<Enrollment> findForUpdate(@Param("id") UUID id);

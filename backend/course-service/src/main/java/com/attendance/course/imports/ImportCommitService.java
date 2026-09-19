@@ -3,6 +3,8 @@ package com.attendance.course.imports;
 import com.attendance.course.*;
 import java.text.Normalizer;
 import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -98,18 +100,30 @@ public class ImportCommitService {
         int createdEnrollments = 0;
         int memberships = 0;
         for (var row : preview.students().stream().sorted(Comparator.comparing(ImportPreview.StudentRow::indexNumber)).toList()) {
-            TeachingGroup group = null;
-            if (row.assignedGroup() != null) {
-                group = usedGroups.get(row.assignedGroup());
+            List<GroupTarget> targets = new ArrayList<>();
+            if (metadata.yearOfStudy() == 1) {
+                targets.add(new GroupTarget(ActivityType.AUDITORY_EXERCISE, row.auditoryGroup()));
+                targets.add(new GroupTarget(ActivityType.LABORATORY_EXERCISE, row.laboratoryGroup()));
+            } else {
+                targets.add(new GroupTarget(metadata.activityType(), row.assignedGroup()));
+            }
+            Set<TeachingGroup> selectedGroups = new LinkedHashSet<>();
+            for (var target : targets) {
+                if (target.groupNumber() == null) {
+                    continue;
+                }
+                String key = target.activityType() + ":" + target.groupNumber();
+                TeachingGroup group = usedGroups.get(key);
                 if (group == null) {
                     group = groups.findByOfferingIdAndActivityTypeAndGroupNumber(offering.getId(),
-                            metadata.activityType(), row.assignedGroup()).orElse(null);
+                            target.activityType(), target.groupNumber()).orElse(null);
                     if (group == null) {
-                        group = groups.saveAndFlush(new TeachingGroup(offering, metadata.activityType(), row.assignedGroup()));
+                        group = groups.saveAndFlush(new TeachingGroup(offering, target.activityType(), target.groupNumber()));
                         createdGroups++;
                     }
-                    usedGroups.put(row.assignedGroup(), group);
+                    usedGroups.put(key, group);
                 }
+                selectedGroups.add(group);
             }
             Student student = students.findByIndexNumber(row.indexNumber()).orElse(null);
             if (student == null) {
@@ -125,19 +139,19 @@ public class ImportCommitService {
                 throw conflict("Red " + row.row() + ": broj indeksa postoji sa drugačijim imenom ili prezimenom.");
             }
             Enrollment enrollment = enrollments.findByStudentIdAndOfferingId(student.getId(), offering.getId()).orElse(null);
-            Set<TeachingGroup> selectedGroup = group == null ? Set.of() : Set.of(group);
             if (enrollment == null) {
-                enrollments.saveAndFlush(new Enrollment(student, offering, row.status(), selectedGroup));
+                enrollments.saveAndFlush(new Enrollment(student, offering, row.status(), selectedGroups));
                 createdEnrollments++;
-                memberships += selectedGroup.size();
+                memberships += selectedGroups.size();
             } else {
                 if (!same(enrollment.getStatus(), row.status())) {
                     throw conflict("Red " + row.row() + ": postojeći upis ima drugačiji status.");
                 }
-                var groupId = group == null ? null : group.getId();
-                if (groupId != null && enrollment.getGroups().stream().noneMatch(existing -> existing.getId().equals(groupId))) {
-                    enrollment.getGroups().add(group);
-                    memberships++;
+                for (var group : selectedGroups) {
+                    if (enrollment.getGroups().stream().noneMatch(existing -> existing.getId().equals(group.getId()))) {
+                        enrollment.getGroups().add(group);
+                        memberships++;
+                    }
                 }
             }
         }
@@ -160,5 +174,8 @@ public class ImportCommitService {
 
     private ResponseStatusException conflict(String message) {
         return new ResponseStatusException(HttpStatus.CONFLICT, message);
+    }
+
+    private record GroupTarget(ActivityType activityType, String groupNumber) {
     }
 }

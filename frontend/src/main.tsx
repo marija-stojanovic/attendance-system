@@ -5,6 +5,7 @@ import './style.css';
 import { SessionQrPanel } from './SessionQrPanel';
 import { CourseManagementPanel } from './CourseManagementPanel';
 import { CourseImportPanel } from './CourseImportPanel';
+import { StudentCoursesPanel } from './StudentCoursesPanel';
 
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -128,6 +129,7 @@ function App() {
       </section>}
       <button disabled={loading} onClick={() => void loadIdentity(token)}>Provjeri nalog</button>
       <button onClick={logout}>Odjavi se</button>
+      {identity?.role === 'STUDENT' && <StudentCoursesPanel apiUrl={apiUrl} token={token} />}
       {identity?.role === 'EMPLOYEE' && <>
         <CourseImportPanel apiUrl={apiUrl} token={token} onImported={result => {
           setImportedCourseId(result.courseId);

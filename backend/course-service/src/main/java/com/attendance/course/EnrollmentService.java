@@ -69,6 +69,10 @@ public class EnrollmentService {
                 .stream().map(EnrollmentResponse::from).toList();
     }
 
+    public List<StudentCourseResponse> findCoursesForStudent(UUID studentId) {
+        return enrollments.findCoursesForStudent(studentId).stream().map(StudentCourseResponse::from).toList();
+    }
+
     @Transactional
     public EnrollmentResponse updateStatus(UUID id, UpdateEnrollmentStatusRequest request) {
         Enrollment enrollment = requireForUpdate(id);
