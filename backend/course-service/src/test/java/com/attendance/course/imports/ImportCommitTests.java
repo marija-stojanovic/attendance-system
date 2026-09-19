@@ -214,12 +214,13 @@ class ImportCommitTests {
 
         JsonNode result = upload(input, "2025/2026");
 
-        assertThat(result.get("groupsCreated").asInt()).isEqualTo(2);
-        assertThat(result.get("groupIds")).hasSize(2);
-        assertThat(result.get("groupMembershipsAdded").asInt()).isEqualTo(2);
+        assertThat(result.get("groupsCreated").asInt()).isEqualTo(4);
+        assertThat(result.get("groupIds")).hasSize(4);
+        assertThat(result.get("groupMembershipsAdded").asInt()).isEqualTo(5);
         assertThat(result.get("warnings")).hasSize(1);
         assertThat(result.get("warnings").get(0).get("message").asText()).contains("1250/25");
-        assertThat(groups.findAll()).extracting(TeachingGroup::getGroupNumber).containsExactlyInAnyOrder("L1", "L2");
+        assertThat(groups.findAll()).extracting(TeachingGroup::getGroupNumber)
+                .containsExactlyInAnyOrder("G1", "G3", "L1", "L2");
 
         Integer uncoveredMemberships = jdbc.queryForObject("""
                 select count(*) from enrollment_groups eg
@@ -227,7 +228,19 @@ class ImportCommitTests {
                 join students s on s.id = e.student_id
                 where s.index_number = '1250/25'
                 """, Integer.class);
-        assertThat(uncoveredMemberships).isZero();
+        assertThat(uncoveredMemberships).isEqualTo(1);
+
+        Student student = students.findByIndexNumber("1101/25").orElseThrow();
+        student.linkIdentity("https://accounts.google.com", "student-subject");
+        students.saveAndFlush(student);
+        mvc.perform(get("/api/student/courses").with(studentJwt("student-subject", student.getInstitutionalEmail())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].courseCode").value("GRUPE-1"))
+                .andExpect(jsonPath("$[0].groups.length()").value(2))
+                .andExpect(jsonPath("$[0].groups[0].activityType").value("AUDITORY_EXERCISE"))
+                .andExpect(jsonPath("$[0].groups[0].groupNumber").value("G1"))
+                .andExpect(jsonPath("$[0].groups[1].activityType").value("LABORATORY_EXERCISE"))
+                .andExpect(jsonPath("$[0].groups[1].groupNumber").value("L1"));
     }
 
     @Test
@@ -264,5 +277,14 @@ class ImportCommitTests {
     private RequestPostProcessor employeeJwt() {
         return jwt().jwt(token -> token.subject(employee.getId().toString()).claim("role", "EMPLOYEE"))
                 .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"));
+    }
+
+    private RequestPostProcessor studentJwt(String subject, String email) {
+        return jwt().jwt(token -> token.subject(subject)
+                        .claim("role", "STUDENT")
+                        .claim("email", email)
+                        .claim("identity_issuer", "https://accounts.google.com")
+                        .claim("identity_subject", subject))
+                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
     }
 }

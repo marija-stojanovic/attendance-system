@@ -59,5 +59,13 @@ button.study-program span { font-size: 14px; font-weight: 400; }
 .group-chips { display: flex; flex-wrap: wrap; gap: 7px; }
 button.group-chip { margin: 0; padding: 7px 11px; color: #215b94; background: white; border: 1px solid #215b94; font-size: 14px; }
 button.group-chip:hover, button.group-chip.active { color: white; background: #215b94; }
+.student-courses { margin-top: 24px; }
+.student-course-list { display: grid; gap: 14px; }
+.student-course-card { padding: 16px; background: white; border: 1px solid #c7d5e0; border-radius: 8px; }
+.student-course-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.student-course-title h3 { margin: 0; }
+.student-course-title p { margin: 4px 0 0; color: #53697d; }
+.student-course-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 14px; }
+.student-course-info div { display: grid; gap: 4px; padding: 10px; background: #edf3f7; border-radius: 6px; }
 @media (max-width: 700px) { main { margin: 24px 16px; padding: 24px; } }
 @media (max-width: 760px) { .course-layout, .student-filters { grid-template-columns: 1fr; } .panel-heading { align-items: flex-start; } }

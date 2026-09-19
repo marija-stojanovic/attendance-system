@@ -107,13 +107,32 @@ public class ImportParser {
                     errors.add(new ImportPreview.RowError(row, "indexNumber", "Broj indeksa je već naveden u redu " + previous + "."));
                 }
             }
-            var assignment = groupAssignments.assign(year, activity, metadata.get(ImportField.GROUP_NUMBER),
-                    student.indexNumber());
-            if (assignment.note() != null) {
-                warnings.add(new ImportPreview.RowWarning(row, "groupNumber", assignment.note()));
+            String auditoryGroup = null;
+            String laboratoryGroup = null;
+            GroupAssignmentService.Assignment assignment;
+            if (year != null && year == 1) {
+                var auditory = groupAssignments.assign(year, ActivityType.AUDITORY_EXERCISE,
+                        metadata.get(ImportField.GROUP_NUMBER), student.indexNumber());
+                var laboratory = groupAssignments.assign(year, ActivityType.LABORATORY_EXERCISE,
+                        metadata.get(ImportField.GROUP_NUMBER), student.indexNumber());
+                auditoryGroup = auditory.groupNumber();
+                laboratoryGroup = laboratory.groupNumber();
+                addWarning(warnings, row, auditory.note());
+                addWarning(warnings, row, laboratory.note());
+                assignment = activity == null ? new GroupAssignmentService.Assignment(null, null) : switch (activity) {
+                    case AUDITORY_EXERCISE -> auditory;
+                    case LABORATORY_EXERCISE -> laboratory;
+                    case LECTURE -> groupAssignments.assign(year, activity,
+                            metadata.get(ImportField.GROUP_NUMBER), student.indexNumber());
+                };
+            } else {
+                assignment = groupAssignments.assign(year, activity, metadata.get(ImportField.GROUP_NUMBER),
+                        student.indexNumber());
+                addWarning(warnings, row, assignment.note());
             }
             students.add(new ImportPreview.StudentRow(row, students.size() + 1, student.lastName(), student.firstName(),
-                    student.indexNumber(), data.get(ImportField.STATUS), email, assignment.groupNumber()));
+                    student.indexNumber(), data.get(ImportField.STATUS), email, assignment.groupNumber(),
+                    auditoryGroup, laboratoryGroup));
         }
         if (students.isEmpty()) {
             errors.add(new ImportPreview.RowError(null, "students", "Fajl ne sadrži studente."));
@@ -221,6 +240,12 @@ public class ImportParser {
             case "laboratorija", "laboratorijske vjezbe", "laboratorijske vezbe", "laboratorijske", "laboratory exercise" -> ActivityType.LABORATORY_EXERCISE;
             default -> null;
         };
+    }
+
+    private void addWarning(List<ImportPreview.RowWarning> warnings, int row, String message) {
+        if (message != null) {
+            warnings.add(new ImportPreview.RowWarning(row, "groupNumber", message));
+        }
     }
 
     private ImportPreview invalid(List<ImportPreview.RowError> errors) {

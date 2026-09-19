@@ -10,7 +10,8 @@ public record ImportPreview(boolean valid, Metadata metadata, List<StudentRow> s
     }
 
     public record StudentRow(int row, int ordinalNumber, String lastName, String firstName, String indexNumber,
-                             String status, String institutionalEmail, String assignedGroup) {
+                             String status, String institutionalEmail, String assignedGroup,
+                             String auditoryGroup, String laboratoryGroup) {
     }
 
     public record RowError(Integer row, String field, String message) {

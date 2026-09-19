@@ -103,6 +103,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health", "/api/auth/**").permitAll()
                         .requestMatchers("/api/me").hasAnyRole("STUDENT", "EMPLOYEE")
+                        .requestMatchers("/api/student/**").hasRole("STUDENT")
                         .requestMatchers("/api/**").hasRole("EMPLOYEE")
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(o -> o.jwt(j -> j.decoder(decoder).jwtAuthenticationConverter(converter)))

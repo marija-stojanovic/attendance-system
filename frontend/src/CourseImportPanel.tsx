@@ -7,7 +7,11 @@ type ImportResult = {
 };
 type Props = { apiUrl: string; token: string; onImported: (result: ImportResult) => void };
 type Metadata = { academicYear: string; courseName: string; courseCode: string; studyProgram: string; studyType: string; yearOfStudy: number; semester: number; activityType: string; groupNumber: string };
-type Student = { row: number; ordinalNumber: number; lastName: string; firstName: string; indexNumber: string; status: string; institutionalEmail: string; assignedGroup: string };
+type Student = {
+  row: number; ordinalNumber: number; lastName: string; firstName: string; indexNumber: string;
+  status: string; institutionalEmail: string; assignedGroup: string;
+  auditoryGroup: string | null; laboratoryGroup: string | null;
+};
 type Preview = { valid: boolean; metadata: Metadata | null; students: Student[]; errors: { row: number | null; field: string; message: string }[]; warnings: ImportWarning[] };
 
 const activityNames: Record<string, string> = {
@@ -84,8 +88,12 @@ export function CourseImportPanel({ apiUrl, token, onImported }: Props) {
         <div><strong>Grupa</strong><span>{metadata.groupNumber}</span></div>
       </div>
       <h3>Studenti ({preview.students.length})</h3>
-      <div className="table-scroll"><table><thead><tr><th>R. br.</th><th>Prezime i ime</th><th>Indeks</th><th>Status</th><th>E-mail</th><th>Grupa</th></tr></thead>
-        <tbody>{preview.students.map(student => <tr key={student.indexNumber}><td>{student.ordinalNumber}</td><td>{student.lastName} {student.firstName}</td><td>{student.indexNumber}</td><td>{student.status}</td><td>{student.institutionalEmail}</td><td>{student.assignedGroup}</td></tr>)}</tbody>
+      <div className="table-scroll"><table><thead><tr><th>R. br.</th><th>Prezime i ime</th><th>Indeks</th><th>Status</th><th>E-mail</th>
+        {metadata.yearOfStudy === 1 ? <><th>Auditorna grupa</th><th>Laboratorijska grupa</th></> : <th>Grupa</th>}
+      </tr></thead>
+        <tbody>{preview.students.map(student => <tr key={student.indexNumber}><td>{student.ordinalNumber}</td><td>{student.lastName} {student.firstName}</td><td>{student.indexNumber}</td><td>{student.status}</td><td>{student.institutionalEmail}</td>
+          {metadata.yearOfStudy === 1 ? <><td>{student.auditoryGroup || 'Nije određena'}</td><td>{student.laboratoryGroup || 'Nije određena'}</td></> : <td>{student.assignedGroup}</td>}
+        </tr>)}</tbody>
       </table></div>
       {preview.warnings.length > 0 && <div className="warnings"><h3>Upozorenja</h3><ul>{preview.warnings.map((item, index) =>
         <li key={index}>{item.row ? `Red ${item.row}: ` : ''}{item.message}</li>)}</ul></div>}
