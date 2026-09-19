@@ -25,6 +25,8 @@ function App() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [courseRefresh, setCourseRefresh] = useState(0);
+  const [importedCourseId, setImportedCourseId] = useState('');
+  const [importedOfferingId, setImportedOfferingId] = useState('');
 
   async function loadIdentity(accessToken: string) {
     setLoading(true);
@@ -127,8 +129,13 @@ function App() {
       <button disabled={loading} onClick={() => void loadIdentity(token)}>Provjeri nalog</button>
       <button onClick={logout}>Odjavi se</button>
       {identity?.role === 'EMPLOYEE' && <>
-        <CourseImportPanel apiUrl={apiUrl} token={token} onImported={() => setCourseRefresh(value => value + 1)} />
-        <CourseManagementPanel apiUrl={apiUrl} token={token} refreshKey={courseRefresh} />
+        <CourseImportPanel apiUrl={apiUrl} token={token} onImported={result => {
+          setImportedCourseId(result.courseId);
+          setImportedOfferingId(result.offeringId);
+          setCourseRefresh(value => value + 1);
+        }} />
+        <CourseManagementPanel apiUrl={apiUrl} token={token} refreshKey={courseRefresh}
+          importedCourseId={importedCourseId} importedOfferingId={importedOfferingId} />
         <SessionQrPanel apiUrl={apiUrl} token={token} />
       </>}
     </> : registration ? <section>

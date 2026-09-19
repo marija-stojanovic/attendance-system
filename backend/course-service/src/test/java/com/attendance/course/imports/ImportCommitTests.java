@@ -1,6 +1,8 @@
 package com.attendance.course.imports;
 
 import com.attendance.course.*;
+import com.attendance.course.security.LocalUser;
+import com.attendance.course.security.LocalUserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
@@ -18,13 +20,15 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 @SpringBootTest(properties = "spring.datasource.url=${IMPORT_TEST_DB_URL:jdbc:h2:mem:import_commit;MODE=PostgreSQL;DB_CLOSE_DELAY=-1}")
-@org.springframework.security.test.context.support.WithMockUser(roles = "EMPLOYEE")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class ImportCommitTests {
@@ -35,17 +39,23 @@ class ImportCommitTests {
     @Autowired private TeachingGroupRepository groups;
     @Autowired private StudentRepository students;
     @Autowired private EnrollmentRepository enrollments;
+    @Autowired private CourseEmployeeRepository courseEmployees;
+    @Autowired private LocalUserRepository localUsers;
     @Autowired private ImportPreviewService previews;
     @Autowired private ImportCommitService imports;
     @Autowired private JdbcTemplate jdbc;
+    private LocalUser employee;
 
     @BeforeEach
     void clear() {
         enrollments.deleteAll();
         groups.deleteAll();
         offerings.deleteAll();
+        courseEmployees.deleteAll();
         students.deleteAll();
         courses.deleteAll();
+        localUsers.deleteAll();
+        employee = localUsers.saveAndFlush(new LocalUser("profesor", "hash", "profesor@etf.unibl.org", "EMPLOYEE"));
     }
 
     @Test
@@ -65,7 +75,11 @@ class ImportCommitTests {
         assertThat(courses.count()).isEqualTo(1);
         assertThat(students.count()).isEqualTo(2);
         assertThat(enrollments.count()).isEqualTo(2);
-        mvc.perform(get("/api/groups/" + first.get("groupId").asText() + "/students"))
+        assertThat(courseEmployees.existsByCourseIdAndEmployeeId(
+                java.util.UUID.fromString(first.get("courseId").asText()), employee.getId())).isTrue();
+        mvc.perform(get("/api/courses").with(employeeJwt()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+        mvc.perform(get("/api/groups/" + first.get("groupId").asText() + "/students").with(employeeJwt()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2));
     }
 
@@ -90,7 +104,7 @@ class ImportCommitTests {
         assertThat(second.get("groupMembershipsAdded").asInt()).isEqualTo(2);
         assertThat(enrollments.count()).isEqualTo(2);
         for (JsonNode result : List.of(first, second)) {
-            mvc.perform(get("/api/groups/" + result.get("groupId").asText() + "/students"))
+            mvc.perform(get("/api/groups/" + result.get("groupId").asText() + "/students").with(employeeJwt()))
                     .andExpect(jsonPath("$.length()").value(2))
                     .andExpect(jsonPath("$[0].groupIds.length()").value(2));
         }
@@ -99,7 +113,7 @@ class ImportCommitTests {
     @Test
     void rejectsInvalidFileWithoutWrites() throws Exception {
         mvc.perform(multipart("/api/imports").file(file(ImportParserTests.CSV.replace("Измишљић;Јана", "Измишљић;")))
-                        .param("academicYear", "2026/2027"))
+                        .param("academicYear", "2026/2027").with(employeeJwt()))
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("valid").value(false));
         assertThat(courses.count()).isZero();
         assertThat(students.count()).isZero();
@@ -109,7 +123,8 @@ class ImportCommitTests {
     @Test
     void rollsBackNewCourseGroupAndEarlierStudentWhenLaterStudentConflicts() throws Exception {
         students.saveAndFlush(new Student("TEST-002/2099", "Drugo", "Prezime", "drugo.prezime@student.etf.org"));
-        mvc.perform(multipart("/api/imports").file(file(ImportParserTests.CSV)).param("academicYear", "2026/2027"))
+        mvc.perform(multipart("/api/imports").file(file(ImportParserTests.CSV)).param("academicYear", "2026/2027")
+                        .with(employeeJwt()))
                 .andExpect(status().isConflict()).andExpect(jsonPath("detail").value(org.hamcrest.Matchers.containsString("Red 7")));
         assertThat(courses.count()).isZero();
         assertThat(offerings.count()).isZero();
@@ -123,10 +138,11 @@ class ImportCommitTests {
     void rollsBackGroupMembershipsOnStatusConflict() throws Exception {
         JsonNode first = upload(ImportParserTests.CSV, "2026/2027");
         String changed = ImportParserTests.CSV.replace(";вјежбе;1", ";вјежбе;2").replace(";ОБНОВА", ";НОВИ");
-        mvc.perform(multipart("/api/imports").file(file(changed)).param("academicYear", "2026/2027"))
+        mvc.perform(multipart("/api/imports").file(file(changed)).param("academicYear", "2026/2027")
+                        .with(employeeJwt()))
                 .andExpect(status().isConflict());
         assertThat(groups.count()).isEqualTo(1);
-        mvc.perform(get("/api/groups/" + first.get("groupId").asText() + "/students"))
+        mvc.perform(get("/api/groups/" + first.get("groupId").asText() + "/students").with(employeeJwt()))
                 .andExpect(jsonPath("$[0].groupIds.length()").value(1));
     }
 
@@ -135,7 +151,8 @@ class ImportCommitTests {
         upload(ImportParserTests.CSV, "2026/2027");
         for (String changed : List.of(ImportParserTests.CSV.replace("Тестни предмет", "Други назив"),
                 ImportParserTests.CSV.replace(";4;8;", ";4;9;"))) {
-            mvc.perform(multipart("/api/imports").file(file(changed)).param("academicYear", "2026/2027"))
+            mvc.perform(multipart("/api/imports").file(file(changed)).param("academicYear", "2026/2027")
+                            .with(employeeJwt()))
                     .andExpect(status().isConflict());
         }
         assertThat(offerings.count()).isEqualTo(1);
@@ -152,10 +169,12 @@ class ImportCommitTests {
     @Test
     void requiresValidAcademicYear() throws Exception {
         for (String year : List.of("", "2026", "2026/2029")) {
-            mvc.perform(multipart("/api/imports").file(file(ImportParserTests.CSV)).param("academicYear", year))
+            mvc.perform(multipart("/api/imports").file(file(ImportParserTests.CSV)).param("academicYear", year)
+                            .with(employeeJwt()))
                     .andExpect(status().isBadRequest());
         }
-        mvc.perform(multipart("/api/imports").file(file(ImportParserTests.CSV))).andExpect(status().isBadRequest());
+        mvc.perform(multipart("/api/imports").file(file(ImportParserTests.CSV)).with(employeeJwt()))
+                .andExpect(status().isBadRequest());
         assertThat(courses.count()).isZero();
     }
 
@@ -164,7 +183,8 @@ class ImportCommitTests {
         for (int attempt = 0; attempt < 2; attempt++) {
             try (var input = getClass().getResourceAsStream("/imports/anonymous-course.xlsx")) {
                 mvc.perform(multipart("/api/imports").file(new MockMultipartFile("file", "example.xlsx",
-                                        "application/octet-stream", input)).param("academicYear", "2026/2027"))
+                                        "application/octet-stream", input)).param("academicYear", "2026/2027")
+                                .with(employeeJwt()))
                         .andExpect(status().isOk()).andExpect(jsonPath("studentsCreated").value(attempt == 0 ? 2 : 0))
                         .andExpect(jsonPath("enrollmentsCreated").value(attempt == 0 ? 2 : 0));
             }
@@ -204,7 +224,7 @@ class ImportCommitTests {
         CyclicBarrier barrier = new CyclicBarrier(2);
         Callable<ImportResult> operation = () -> {
             barrier.await(10, TimeUnit.SECONDS);
-            return imports.commit(preview, "2026/2027");
+            return imports.commit(preview, "2026/2027", employee.getId());
         };
         try (var executor = Executors.newFixedThreadPool(2)) {
             var futures = executor.invokeAll(List.of(operation, operation), 40, TimeUnit.SECONDS);
@@ -223,8 +243,14 @@ class ImportCommitTests {
     }
 
     private JsonNode upload(String text, String year) throws Exception {
-        var response = mvc.perform(multipart("/api/imports").file(file(text)).param("academicYear", year))
+        var response = mvc.perform(multipart("/api/imports").file(file(text)).param("academicYear", year)
+                        .with(employeeJwt()))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         return json.readTree(response);
+    }
+
+    private RequestPostProcessor employeeJwt() {
+        return jwt().jwt(token -> token.subject(employee.getId().toString()).claim("role", "EMPLOYEE"))
+                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"));
     }
 }
