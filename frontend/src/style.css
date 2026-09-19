@@ -26,17 +26,16 @@ select { padding: 11px; border: 1px solid #9badbd; border-radius: 6px; font: inh
 table { width: 100%; border-collapse: collapse; background: white; }
 th, td { padding: 9px; border: 1px solid #c7d5e0; text-align: left; white-space: nowrap; }
 th { background: #dfeaf3; }
-.panel-heading, .detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.panel-heading h2, .panel-heading h3, .detail-heading h3 { margin-bottom: 4px; }
-.panel-heading button, .detail-heading button { flex: 0 0 auto; }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.panel-heading h2, .panel-heading h3 { margin-bottom: 4px; }
 .course-layout { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(320px, 1.5fr); gap: 24px; margin-top: 18px; }
 .item-list { display: grid; gap: 8px; }
 button.item { display: grid; gap: 3px; width: 100%; margin: 0; text-align: left; background: white; color: #172d43; border: 1px solid #b8c7d4; }
 button.item:hover, button.item.active { border-color: #215b94; background: #e3effa; }
 button.item span { font-size: 14px; font-weight: 400; }
-.editor, .groups-editor, .employees-editor { margin: 16px 0; padding: 16px; border: 1px solid #c7d5e0; border-radius: 8px; background: white; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-button.secondary { background: #64798c; }
+.course-title h3 { margin: 0; }
+.course-title p { margin: 4px 0 0; color: #53697d; }
+.course-employees { display: grid; gap: 4px; margin-top: 14px; padding: 12px; background: white; border: 1px solid #c7d5e0; border-radius: 7px; }
 .success { color: #176536; background: #e8f7ed; padding: 12px; }
 .warnings { margin: 16px 0; padding: 12px 16px; background: #fff6dc; color: #704d00; border-radius: 8px; }
 .warnings h3 { margin-top: 0; }
@@ -45,9 +44,20 @@ button.secondary { background: #64798c; }
 .import-result span { font-size: 1.35rem; }
 .students-panel { margin-top: 24px; }
 .student-filters { display: grid; grid-template-columns: minmax(220px, 2fr) minmax(180px, 1fr); gap: 12px; margin-bottom: 14px; }
-.academic-year { margin-top: 18px; }
-.academic-year h4 { margin: 0 0 8px; }
-.group-list { display: grid; gap: 8px; padding: 0; list-style: none; }
-.group-list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px; background: #edf3f7; border-radius: 6px; }
+.academic-year { margin-top: 18px; border: 1px solid #c7d5e0; background: #f8fbfd; }
+.academic-year h4 { margin: 0 0 10px; font-size: 20px; }
+.study-programs { display: grid; gap: 8px; }
+button.study-program { display: grid; gap: 4px; width: 100%; margin: 0; text-align: left; color: #172d43; background: white; border: 1px solid #b8c7d4; }
+button.study-program:hover, button.study-program.active { border-color: #215b94; background: #e3effa; }
+button.study-program span { font-size: 14px; font-weight: 400; }
+.offering-details { margin-top: 14px; padding: 16px; background: white; border-left: 3px solid #215b94; border-radius: 7px; }
+.offering-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; }
+.offering-summary div { display: grid; gap: 4px; padding: 10px; background: #edf3f7; border-radius: 6px; }
+.activity-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 16px; }
+.activity-group { display: grid; align-content: start; gap: 8px; padding: 12px; border: 1px solid #c7d5e0; border-radius: 7px; }
+.activity-group > span { color: #64798c; }
+.group-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+button.group-chip { margin: 0; padding: 7px 11px; color: #215b94; background: white; border: 1px solid #215b94; font-size: 14px; }
+button.group-chip:hover, button.group-chip.active { color: white; background: #215b94; }
 @media (max-width: 700px) { main { margin: 24px 16px; padding: 24px; } }
-@media (max-width: 760px) { .course-layout, .student-filters { grid-template-columns: 1fr; } .panel-heading, .detail-heading { align-items: flex-start; } }
+@media (max-width: 760px) { .course-layout, .student-filters { grid-template-columns: 1fr; } .panel-heading { align-items: flex-start; } }
