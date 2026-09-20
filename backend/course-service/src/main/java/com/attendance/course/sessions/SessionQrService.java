@@ -98,6 +98,15 @@ public class SessionQrService {
         }
     }
 
+    public UUID validate(String token) {
+        try {
+            if (token == null || token.length() > 2048) throw invalid();
+            return validate(UUID.fromString(SignedJWT.parse(token).getJWTClaimsSet().getSubject()), token);
+        } catch (ParseException | IllegalArgumentException | NullPointerException exception) {
+            throw invalid();
+        }
+    }
+
     private Instant windowStart(TeachingSession session, Instant now) {
         if (session.getStatus() != SessionStatus.ACTIVE || session.getQrStartedAt() == null
                 || now.isBefore(session.getQrStartedAt())) {
