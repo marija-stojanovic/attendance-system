@@ -13,6 +13,7 @@ import com.nimbusds.jwt.SignedJWT;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.net.URLEncoder;
 import java.text.ParseException;
 import java.time.Clock;
 import java.time.Instant;
@@ -20,10 +21,13 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.security.MessageDigest;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import javax.imageio.ImageIO;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,18 +42,28 @@ public class SessionQrService {
     private final Clock clock;
     private final int interval;
     private final byte[] signingKey;
+    private final String frontendOrigin;
 
+    @Autowired
     public SessionQrService(TeachingSessionRepository sessions, Clock qrClock, SecretKey applicationKey,
-            @Value("${session-qr.rotation-seconds:30}") int interval) throws java.security.GeneralSecurityException {
+            @Value("${session-qr.rotation-seconds:30}") int interval,
+            @Value("${authentication.frontend-origin:http://localhost:5173}") String frontendOrigin)
+            throws java.security.GeneralSecurityException {
         if (interval < 5 || interval > 300) {
             throw new IllegalArgumentException("Interval QR koda mora biti između 5 i 300 sekundi.");
         }
         this.sessions = sessions;
         this.clock = qrClock;
         this.interval = interval;
+        this.frontendOrigin = frontendOrigin.replaceAll("/+$", "");
         Mac derivation = Mac.getInstance("HmacSHA256");
         derivation.init(applicationKey);
         signingKey = derivation.doFinal(AUDIENCE.getBytes(StandardCharsets.UTF_8));
+    }
+
+    SessionQrService(TeachingSessionRepository sessions, Clock qrClock, SecretKey applicationKey, int interval)
+            throws java.security.GeneralSecurityException {
+        this(sessions, qrClock, applicationKey, interval, "http://localhost:5173");
     }
 
     public Instant now() {
@@ -72,7 +86,9 @@ public class SessionQrService {
             var jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.HS256).type(TYPE).build(), claims);
             jwt.sign(new MACSigner(signingKey));
             String token = jwt.serialize();
-            return new QrResponse(session.getId(), token, image(token), expiresAt, now);
+            String scanUrl = frontendOrigin + "/?attendanceToken="
+                    + URLEncoder.encode(token, StandardCharsets.UTF_8);
+            return new QrResponse(session.getId(), token, pin(session, issuedAt), image(scanUrl), scanUrl, expiresAt, now);
         } catch (JOSEException exception) {
             throw new IllegalStateException("Generisanje QR tokena nije uspjelo.", exception);
         }
@@ -107,6 +123,17 @@ public class SessionQrService {
         }
     }
 
+    public UUID validatePin(String value) {
+        if (value == null || !value.matches("\\d{6}")) throw invalidPin();
+        byte[] supplied = value.getBytes(StandardCharsets.US_ASCII);
+        List<UUID> matches = sessions.findByStatus(SessionStatus.ACTIVE).stream()
+                .filter(session -> MessageDigest.isEqual(
+                        pin(session, windowStart(session, now())).getBytes(StandardCharsets.US_ASCII), supplied))
+                .map(TeachingSession::getId).toList();
+        if (matches.size() != 1) throw invalidPin();
+        return matches.getFirst();
+    }
+
     private Instant windowStart(TeachingSession session, Instant now) {
         if (session.getStatus() != SessionStatus.ACTIVE || session.getQrStartedAt() == null
                 || now.isBefore(session.getQrStartedAt())) {
@@ -133,9 +160,28 @@ public class SessionQrService {
         }
     }
 
+    private String pin(TeachingSession session, Instant issuedAt) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(signingKey, "HmacSHA256"));
+            byte[] digest = mac.doFinal(("pin:" + session.getId() + ":" + issuedAt.getEpochSecond())
+                    .getBytes(StandardCharsets.UTF_8));
+            long number = ((digest[0] & 0xffL) << 24) | ((digest[1] & 0xffL) << 16)
+                    | ((digest[2] & 0xffL) << 8) | (digest[3] & 0xffL);
+            return "%06d".formatted(number % 1_000_000);
+        } catch (java.security.GeneralSecurityException exception) {
+            throw new IllegalStateException("Generisanje PIN koda nije uspjelo.", exception);
+        }
+    }
+
     private ResponseStatusException invalid() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "QR token nije važeći.");
     }
 
-    public record QrResponse(UUID sessionId, String token, String imageDataUrl, Instant expiresAt, Instant serverTime) {}
+    private ResponseStatusException invalidPin() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "PIN kod nije važeći.");
+    }
+
+    public record QrResponse(UUID sessionId, String token, String pin, String imageDataUrl, String scanUrl,
+            Instant expiresAt, Instant serverTime) {}
 }

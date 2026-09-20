@@ -112,9 +112,10 @@ public class SecurityConfig {
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(
-            @Value("${authentication.frontend-origin}") String origin) {
+            @Value("${authentication.allowed-origins}") String origins) {
         CorsConfiguration cors = new CorsConfiguration();
-        cors.setAllowedOrigins(List.of(origin));
+        cors.setAllowedOrigins(java.util.Arrays.stream(origins.split(","))
+                .map(String::trim).filter(value -> !value.isBlank()).toList());
         cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cors.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
