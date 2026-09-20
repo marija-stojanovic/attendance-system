@@ -14,6 +14,7 @@ export function StudentAttendancePanel({ apiUrl, token }: { apiUrl: string; toke
   const stream = useRef<MediaStream | null>(null);
   const frame = useRef(0);
   const [qrToken, setQrToken] = useState('');
+  const [pin, setPin] = useState('');
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -28,17 +29,49 @@ export function StudentAttendancePanel({ apiUrl, token }: { apiUrl: string; toke
 
   useEffect(() => stop, []);
 
+  useEffect(() => {
+    const value = new URLSearchParams(window.location.search).get('attendanceToken');
+    if (!value) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('attendanceToken');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    setQrToken(value);
+    void submit(value);
+  }, []);
+
+  function tokenFrom(value: string) {
+    const trimmed = value.trim();
+    try { return new URL(trimmed).searchParams.get('attendanceToken') || trimmed; }
+    catch { return trimmed; }
+  }
+
   async function submit(value: string) {
-    if (!value.trim() || saving) return;
+    const attendanceToken = tokenFrom(value);
+    if (!attendanceToken || saving) return;
     setSaving(true); setError(''); setResult(null);
     try {
       const response = await fetch(apiUrl + '/api/student/attendance', {
         method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: value.trim() })
+        body: JSON.stringify({ token: attendanceToken, pin: null })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || 'Prisustvo nije moguće evidentirati.');
       setResult(data); setQrToken(''); stop();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Prisustvo nije moguće evidentirati.'); }
+    finally { setSaving(false); }
+  }
+
+  async function submitPin() {
+    if (!/^\d{6}$/.test(pin) || saving) return;
+    setSaving(true); setError(''); setResult(null);
+    try {
+      const response = await fetch(apiUrl + '/api/student/attendance', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: null, pin })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Prisustvo nije moguće evidentirati.');
+      setResult(data); setPin(''); stop();
     } catch (e) { setError(e instanceof Error ? e.message : 'Prisustvo nije moguće evidentirati.'); }
     finally { setSaving(false); }
   }
@@ -68,13 +101,14 @@ export function StudentAttendancePanel({ apiUrl, token }: { apiUrl: string; toke
 
   return <section className="attendance-panel">
     <h2>Evidencija prisustva</h2>
-    <p>Skenirajte QR kod koji je prikazao zaposleni.</p>
+    <p>Skenirajte QR kod ili unesite šestocifreni PIN koji je prikazao zaposleni.</p>
     {!scanning && <button disabled={saving} onClick={() => void start()}>Pokreni kameru</button>}
     <video ref={video} className="qr-camera" muted playsInline hidden={!scanning} />
     {scanning && <button onClick={stop}>Zaustavi kameru</button>}
-    <form onSubmit={(event: FormEvent) => { event.preventDefault(); void submit(qrToken); }}>
-      <label>Ručni unos QR tokena<input value={qrToken} onChange={event => setQrToken(event.target.value)} maxLength={2048} /></label>
-      <button disabled={saving || !qrToken.trim()} type="submit">{saving ? 'Provjera…' : 'Evidentiraj prisustvo'}</button>
+    <form onSubmit={(event: FormEvent) => { event.preventDefault(); void submitPin(); }}>
+      <label>PIN kod<input inputMode="numeric" autoComplete="one-time-code" value={pin}
+        onChange={event => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))} maxLength={6} /></label>
+      <button disabled={saving || !/^\d{6}$/.test(pin)} type="submit">{saving ? 'Provjera…' : 'Evidentiraj prisustvo'}</button>
     </form>
     {error && <p className="error" role="alert">{error}</p>}
     {result && <div className="success"><strong>Prisustvo je evidentirano.</strong><br />

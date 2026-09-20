@@ -26,6 +26,10 @@ students:
 session-qr:
   rotation-seconds: ${QR_ROTATION_SECONDS:30}
 
+teaching-session:
+  max-active-seconds: ${SESSION_MAX_ACTIVE_SECONDS:14400}
+  expiration-check-milliseconds: 60000
+
 course-import:
   max-rows: 5000
   max-columns: 64
@@ -108,6 +112,7 @@ authentication:
   google-client-id: ${GOOGLE_CLIENT_ID:}
   student-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.unibl.org}
   frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
+  allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:${FRONTEND_ORIGIN:http://localhost:5173}}
   test-employee-enabled: ${TEST_EMPLOYEE_ENABLED:true}
   test-employee-username: ${TEST_EMPLOYEE_USERNAME:profesor}
   test-employee-password: ${TEST_EMPLOYEE_PASSWORD:Profesor123!}

@@ -93,6 +93,20 @@ class AttendanceTests {
     }
 
     @Test
+    void recordsAttendanceUsingCurrentPin() throws Exception {
+        enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
+        TeachingSession session = activeSession(lecture);
+        String pin = qr.current(session.getId()).pin();
+
+        mvc.perform(post("/api/student/attendance").with(studentJwt()).contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("pin", pin))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("sessionId").value(session.getId().toString()))
+                .andExpect(jsonPath("studentId").value(student.getId().toString()));
+        assertThat(attendances.count()).isOne();
+    }
+
+    @Test
     void preventsRepeatedAttendanceForSameSession() throws Exception {
         enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
         TeachingSession session = activeSession(lecture);

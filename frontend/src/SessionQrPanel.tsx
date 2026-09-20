@@ -3,7 +3,7 @@ import { CreateSessionForm } from './CreateSessionForm';
 
 type Course = { id: string; code: string; name: string };
 type Session = { id: string; offeringId: string; groupId: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string };
-type Qr = { imageDataUrl: string; expiresAt: string; serverTime: string };
+type Qr = { imageDataUrl: string; pin: string; expiresAt: string; serverTime: string };
 type Attendance = { id: string; studentId: string; firstName: string; lastName: string; indexNumber: string; groupNumber: string; recordedAt: string };
 const activities: Record<string, string> = {
   LECTURE: 'Predavanje', AUDITORY_EXERCISE: 'Auditorne vježbe', LABORATORY_EXERCISE: 'Laboratorijske vježbe'
@@ -20,7 +20,7 @@ async function request<T>(url: string, token: string, signal: AbortSignal, metho
 }
 
 function QrDisplay({ url, token }: { url: string; token: string }) {
-  const [qr, setQr] = useState<{ image: string; deadline: number } | null>(null);
+  const [qr, setQr] = useState<{ image: string; pin: string; deadline: number } | null>(null);
   const [remaining, setRemaining] = useState(0);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -39,7 +39,7 @@ function QrDisplay({ url, token }: { url: string; token: string }) {
         const lifetime = Date.parse(data.expiresAt) - Date.parse(data.serverTime) - (performance.now() - started);
         clearTimeout(expiry);
         if (lifetime > 0 && !document.hidden) {
-          setQr({ image: data.imageDataUrl, deadline: performance.now() + lifetime });
+          setQr({ image: data.imageDataUrl, pin: data.pin, deadline: performance.now() + lifetime });
           setRemaining(Math.ceil(lifetime / 1000));
           setError('');
           expiry = setTimeout(() => setQr(null), lifetime);
@@ -79,6 +79,8 @@ function QrDisplay({ url, token }: { url: string; token: string }) {
   return <div className="session-qr">
     {error && <p role="alert" className="error">{error}</p>}
     {qr ? <><img src={qr.image} width="420" height="420" alt="QR kod aktivne sesije za skeniranje" />
+      <p className="attendance-pin"><span>PIN kod</span><strong>{qr.pin}</strong></p>
+      <button type="button" onClick={() => void navigator.clipboard.writeText(qr.pin)}>Kopiraj PIN</button>
       <p>Novi QR kod za {remaining} s</p></> : <p role="status">Čekanje važećeg QR koda…</p>}
   </div>;
 }
@@ -145,11 +147,11 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
     <h2>Sesije nastave</h2>
     {error && <p role="alert" className="error">{error}</p>}
     <label>Predmet<select disabled={busy || creating} value={courseId} onChange={e => {
-      setSessions([]); setSessionId(''); setCourseId(e.target.value); setCreating(Boolean(e.target.value));
+      setSessions([]); setSessionId(''); setCourseId(e.target.value); setCreating(false); setEditing(false);
     }}><option value="">Izaberite predmet</option>
       {courses.map(course => <option key={course.id} value={course.id}>{course.code} — {course.name}</option>)}
     </select></label>
-    {!courseId && <p>Izaberite predmet da biste unijeli podatke za novu sesiju.</p>}
+    {!courseId && <p>Izaberite predmet da biste pregledali njegove sesije ili kreirali novu.</p>}
     <button disabled={busy || creating} onClick={() => setReload(value => value + 1)}>Osvježi spisak</button>
     {courseId && !creating && <button disabled={busy} onClick={() => { setSessionId(''); setCreating(true); }}>Kreiraj novu sesiju</button>}
     {creating && <CreateSessionForm apiUrl={apiUrl} token={token} courseId={courseId}
@@ -167,7 +169,7 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
         setEditing(false); setError('');
       }} />}
     {courseId && !creating && !editing && <div>
-      <h3>Kreirane sesije predmeta</h3>
+      <h3>Pregled sesija</h3>
       {sessions.length === 0 && <p>Za ovaj predmet još nema kreiranih sesija.</p>}
       {sessions.map(session => <article key={session.id}>
         <p><strong>{session.date} u {session.startTime.slice(0, 5)}</strong><br />

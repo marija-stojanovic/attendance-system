@@ -45,6 +45,7 @@ class SessionQrTests {
     @Autowired private SessionQrService qr;
     @Autowired private TeachingSessionService service;
     @Autowired private TeachingSessionRepository sessions;
+    @Autowired private TeachingSessionExpirationService expiration;
     @Autowired private CourseRepository courses;
     @Autowired private CourseOfferingRepository offerings;
     @Autowired private TeachingGroupRepository groups;
@@ -79,12 +80,15 @@ class SessionQrTests {
         assertThat(claims.getSubject()).isEqualTo(id.toString());
         assertThat(response.expiresAt()).isEqualTo(start.plusSeconds(10));
         assertThat(qr.validate(id, response.token())).isEqualTo(id);
+        assertThat(response.pin()).matches("\\d{6}");
+        assertThat(qr.validatePin(response.pin())).isEqualTo(id);
         var image = ImageIO.read(new ByteArrayInputStream(Base64.getDecoder()
                 .decode(response.imageDataUrl().substring("data:image/png;base64,".length()))));
         int width = image.getWidth(), height = image.getHeight();
         var source = new RGBLuminanceSource(width, height, image.getRGB(0, 0, width, height, null, 0, width));
         assertThat(new QRCodeReader().decode(new BinaryBitmap(new HybridBinarizer(source))).getText())
-                .isEqualTo(response.token());
+                .isEqualTo(response.scanUrl());
+        assertThat(response.scanUrl()).startsWith("http://localhost:5173/?attendanceToken=");
         mvc.perform(get("/api/sessions/{id}/qr", id)).andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("sessionId").value(id.toString()))
@@ -94,7 +98,8 @@ class SessionQrTests {
     @Test
     void rotatesAtBoundaryAndRejectsExpiredTokenWithoutAnotherRead() {
         service.activate(id);
-        String original = qr.current(id).token();
+        var originalResponse = qr.current(id);
+        String original = originalResponse.token();
         when(qrClock.instant()).thenReturn(start.plusSeconds(9).plusMillis(999));
         assertThat(qr.current(id).token()).isEqualTo(original);
         assertThat(qr.validate(id, original)).isEqualTo(id);
@@ -102,10 +107,20 @@ class SessionQrTests {
         assertThatThrownBy(() -> qr.validate(id, original)).isInstanceOf(ResponseStatusException.class);
         var next = qr.current(id);
         assertThat(next.token()).isNotEqualTo(original);
+        assertThat(next.pin()).isNotEqualTo(originalResponse.pin());
         assertThat(next.expiresAt()).isEqualTo(start.plusSeconds(20));
         assertThat(qr.validate(id, next.token())).isEqualTo(id);
         when(qrClock.instant()).thenReturn(start.plusSeconds(65));
         assertThat(qr.current(id).expiresAt()).isEqualTo(start.plusSeconds(70));
+    }
+
+    @Test
+    void closesActiveSessionAfterConfiguredMaximumDuration() {
+        service.activate(id);
+        when(qrClock.instant()).thenReturn(start.plusSeconds(14400));
+        assertThat(expiration.closeExpired()).isEqualTo(1);
+        assertThat(sessions.findById(id).orElseThrow().getStatus()).isEqualTo(SessionStatus.CLOSED);
+        assertThatThrownBy(() -> qr.current(id)).isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
@@ -135,6 +150,13 @@ class SessionQrTests {
     void rejectsMalformedTokens(String token) {
         service.activate(id);
         assertThatThrownBy(() -> qr.validate(id, token)).isInstanceOf(ResponseStatusException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "12345", "1234567", "abcdef"})
+    void rejectsInvalidPins(String pin) {
+        service.activate(id);
+        assertThatThrownBy(() -> qr.validatePin(pin)).isInstanceOf(ResponseStatusException.class);
     }
 
     @Test

@@ -16,6 +16,6 @@ public class AttendanceController {
 
     @PostMapping
     public AttendanceResponse record(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody AttendanceRequest request) {
-        return attendance.record(jwt, request.token());
+        return attendance.record(jwt, request.token(), request.pin());
     }
 }

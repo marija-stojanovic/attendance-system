@@ -18,6 +18,9 @@ select { padding: 11px; border: 1px solid #9badbd; border-radius: 6px; font: inh
 .session-panel label { margin-bottom: 14px; }
 .session-qr { text-align: center; margin-top: 20px; }
 .session-qr img { display: block; width: 100%; max-width: 420px; height: auto; margin: auto; }
+.attendance-pin { display: grid; gap: 4px; justify-content: center; margin: 14px 0 8px; }
+.attendance-pin span { font-size: 14px; color: #52606d; }
+.attendance-pin strong { font-size: 34px; letter-spacing: 8px; font-variant-numeric: tabular-nums; }
 .attendance-panel { margin-top: 24px; display: grid; gap: 14px; }
 .attendance-panel form { margin-top: 8px; }
 .qr-camera { display: block; width: 100%; max-width: 520px; max-height: 390px; margin: 8px auto; border-radius: 8px; background: #101820; }

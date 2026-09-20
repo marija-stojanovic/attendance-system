@@ -47,8 +47,13 @@ public class AttendanceService {
     }
 
     @Transactional
-    public AttendanceResponse record(Jwt jwt, String token) {
-        UUID sessionId = qr.validate(token);
+    public AttendanceResponse record(Jwt jwt, String token, String pin) {
+        boolean hasToken = token != null && !token.isBlank();
+        boolean hasPin = pin != null && !pin.isBlank();
+        if (hasToken == hasPin) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Pošaljite QR token ili PIN kod.");
+        }
+        UUID sessionId = hasToken ? qr.validate(token) : qr.validatePin(pin);
         TeachingSession session = sessions.findForUpdate(sessionId).orElseThrow(() -> invalidQr());
         if (session.getStatus() != SessionStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Sesija više nije aktivna.");
