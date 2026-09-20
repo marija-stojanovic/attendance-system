@@ -9,13 +9,18 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/sessions")
 public class SessionQrController {
     private final SessionQrService qr;
+    private final TeachingSessionService sessions;
 
-    public SessionQrController(SessionQrService qr) {
+    public SessionQrController(SessionQrService qr, TeachingSessionService sessions) {
         this.qr = qr;
+        this.sessions = sessions;
     }
 
     @GetMapping("/{id}/qr")
-    public ResponseEntity<SessionQrService.QrResponse> current(@PathVariable UUID id) {
+    public ResponseEntity<SessionQrService.QrResponse> current(@PathVariable UUID id,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            org.springframework.security.oauth2.jwt.Jwt jwt) {
+        sessions.requireAccess(id, jwt == null ? null : UUID.fromString(jwt.getSubject()));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(qr.current(id));
     }
 }

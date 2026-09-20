@@ -6,6 +6,8 @@ import com.attendance.course.sessions.SessionStatus;
 import com.attendance.course.sessions.TeachingSession;
 import com.attendance.course.sessions.TeachingSessionRepository;
 import java.util.UUID;
+import java.util.List;
+import com.attendance.course.CourseEmployeeRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -20,14 +22,28 @@ public class AttendanceService {
     private final StudentRepository students;
     private final EnrollmentRepository enrollments;
     private final SessionQrService qr;
+    private final CourseEmployeeRepository courseEmployees;
 
     public AttendanceService(AttendanceRepository attendances, TeachingSessionRepository sessions,
-            StudentRepository students, EnrollmentRepository enrollments, SessionQrService qr) {
+            StudentRepository students, EnrollmentRepository enrollments, SessionQrService qr,
+            CourseEmployeeRepository courseEmployees) {
         this.attendances = attendances;
         this.sessions = sessions;
         this.students = students;
         this.enrollments = enrollments;
         this.qr = qr;
+        this.courseEmployees = courseEmployees;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AttendanceListResponse> findBySession(UUID sessionId, UUID employeeId) {
+        TeachingSession session = sessions.findById(sessionId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Sesija nije pronađena."));
+        if (!courseEmployees.existsByCourseIdAndEmployeeId(session.getCourse().getId(), employeeId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Nemate pristup sesijama ovog predmeta.");
+        }
+        return attendances.findBySessionIdOrderByRecordedAtAscStudentLastNameAscStudentFirstNameAsc(sessionId)
+                .stream().map(AttendanceListResponse::from).toList();
     }
 
     @Transactional

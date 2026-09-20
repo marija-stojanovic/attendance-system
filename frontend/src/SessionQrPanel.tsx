@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { CreateSessionForm } from './CreateSessionForm';
 
 type Course = { id: string; code: string; name: string };
-type Session = { id: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string };
+type Session = { id: string; offeringId: string; groupId: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string };
 type Qr = { imageDataUrl: string; expiresAt: string; serverTime: string };
+type Attendance = { id: string; studentId: string; firstName: string; lastName: string; indexNumber: string; groupNumber: string; recordedAt: string };
 const activities: Record<string, string> = {
   LECTURE: 'Predavanje', AUDITORY_EXERCISE: 'Auditorne vježbe', LABORATORY_EXERCISE: 'Laboratorijske vježbe'
 };
@@ -91,6 +92,9 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
   const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [attendances, setAttendances] = useState<Attendance[]>([]);
+  const [attendanceReload, setAttendanceReload] = useState(0);
   const selected = sessions.find(session => session.id === sessionId);
   useEffect(() => {
     const controller = new AbortController();
@@ -118,6 +122,14 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
     }, 2000);
     return () => { clearInterval(timer); controller.abort(); };
   }, [apiUrl, token, selected?.id, selected?.status]);
+  useEffect(() => {
+    setAttendances([]);
+    if (!selected) return;
+    const controller = new AbortController();
+    request<Attendance[]>(`${apiUrl}/api/sessions/${selected.id}/attendances`, token, controller.signal)
+      .then(setAttendances).catch(e => { if (!controller.signal.aborted) setError(e.message); });
+    return () => controller.abort();
+  }, [apiUrl, token, selected?.id, attendanceReload]);
   async function changeState(action: 'activate' | 'close') {
     if (!selected) return;
     setBusy(true);
@@ -148,7 +160,13 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
         setCreating(false);
         setError('');
       }} />}
-    {courseId && !creating && <div>
+    {editing && selected && <CreateSessionForm apiUrl={apiUrl} token={token} courseId={courseId} session={selected}
+      onCancel={() => setEditing(false)} onCreated={session => {
+        setSessions(previous => previous.map(item => item.id === session.id ? session : item)
+          .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)));
+        setEditing(false); setError('');
+      }} />}
+    {courseId && !creating && !editing && <div>
       <h3>Kreirane sesije predmeta</h3>
       {sessions.length === 0 && <p>Za ovaj predmet još nema kreiranih sesija.</p>}
       {sessions.map(session => <article key={session.id}>
@@ -160,17 +178,27 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
         </button>
       </article>)}
     </div>}
-    {selected && !creating && <>
+    {selected && !creating && !editing && <>
       <h3>Detalji sesije</h3>
       <p>Predmet: {courses.find(course => course.id === courseId)?.name}<br />
         Datum: {selected.date}<br />Vrijeme početka: {selected.startTime.slice(0, 5)}<br />
         Oblik aktivnosti: {activities[selected.activityType]}<br />Grupa: {selected.groupNumber}</p>
       <p>Stanje: {statuses[selected.status]}</p>
+      {selected.status === 'CREATED' && <button disabled={busy} onClick={() => setEditing(true)}>Izmijeni sesiju</button>}
       {selected.status === 'CREATED' && <button disabled={busy} onClick={() => void changeState('activate')}>Aktiviraj sesiju</button>}
       {selected.status === 'ACTIVE' && <>
         <button disabled={busy} onClick={() => void changeState('close')}>Zatvori sesiju</button>
         {!busy && <QrDisplay key={selected.id} url={`${apiUrl}/api/sessions/${selected.id}/qr`} token={token} />}
       </>}
+      <div className="attendance-list">
+        <div className="panel-heading"><h3>Prisutni studenti ({attendances.length})</h3>
+          <button disabled={busy} onClick={() => setAttendanceReload(value => value + 1)}>Osvježi</button></div>
+        {attendances.length === 0 ? <p>Prisustvo još nije evidentirano.</p> : <div className="table-scroll"><table>
+          <thead><tr><th>Student</th><th>Indeks</th><th>Grupa</th><th>Vrijeme prijave</th></tr></thead>
+          <tbody>{attendances.map(item => <tr key={item.id}><td>{item.lastName} {item.firstName}</td>
+            <td>{item.indexNumber}</td><td>{item.groupNumber}</td><td>{new Date(item.recordedAt).toLocaleString('bs-BA')}</td></tr>)}</tbody>
+        </table></div>}
+      </div>
     </>}
   </section>;
 }

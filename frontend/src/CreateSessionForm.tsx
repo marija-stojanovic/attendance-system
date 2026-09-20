@@ -2,20 +2,20 @@ import { useEffect, useState, type FormEvent } from 'react';
 
 type Offering = { id: string; academicYear: string; studyProgram: string; studyType: string; yearOfStudy: number; semester: number };
 type Group = { id: string; activityType: string; groupNumber: string };
-type Session = { id: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string };
-type Props = { apiUrl: string; token: string; courseId: string; onCancel: () => void; onCreated: (session: Session) => void };
+type Session = { id: string; offeringId: string; groupId: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string };
+type Props = { apiUrl: string; token: string; courseId: string; session?: Session; onCancel: () => void; onCreated: (session: Session) => void };
 const activities: Record<string, string> = {
   LECTURE: 'Predavanje', AUDITORY_EXERCISE: 'Auditorne vježbe', LABORATORY_EXERCISE: 'Laboratorijske vježbe'
 };
 
-export function CreateSessionForm({ apiUrl, token, courseId, onCancel, onCreated }: Props) {
+export function CreateSessionForm({ apiUrl, token, courseId, session, onCancel, onCreated }: Props) {
   const [offerings, setOfferings] = useState<Offering[]>([]);
-  const [offeringId, setOfferingId] = useState('');
+  const [offeringId, setOfferingId] = useState(session?.offeringId || '');
   const [groups, setGroups] = useState<Group[]>([]);
-  const [activity, setActivity] = useState('');
-  const [groupId, setGroupId] = useState('');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
+  const [activity, setActivity] = useState(session?.activityType || '');
+  const [groupId, setGroupId] = useState(session?.groupId || '');
+  const [date, setDate] = useState(session?.date || '');
+  const [time, setTime] = useState(session?.startTime.slice(0, 5) || '');
   const [loadingOfferings, setLoadingOfferings] = useState(true);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -30,13 +30,14 @@ export function CreateSessionForm({ apiUrl, token, courseId, onCancel, onCreated
       const data: Offering[] = await response.json();
       if (controller.signal.aborted) return;
       setOfferings(data);
-      if (data.length === 1) setOfferingId(data[0].id);
+      if (!session && data.length === 1) setOfferingId(data[0].id);
     }).catch(e => { if (!controller.signal.aborted) setError(e.message); })
       .finally(() => { if (!controller.signal.aborted) setLoadingOfferings(false); });
     return () => controller.abort();
   }, [apiUrl, token, courseId]);
   useEffect(() => {
-    setGroups([]); setActivity(''); setGroupId('');
+    setGroups([]);
+    if (!session || offeringId !== session.offeringId) { setActivity(''); setGroupId(''); }
     if (!offeringId) return;
     const controller = new AbortController();
     setLoadingGroups(true); setError('');
@@ -49,14 +50,14 @@ export function CreateSessionForm({ apiUrl, token, courseId, onCancel, onCreated
     }).catch(e => { if (!controller.signal.aborted) setError(e.message); })
       .finally(() => { if (!controller.signal.aborted) setLoadingGroups(false); });
     return () => controller.abort();
-  }, [apiUrl, token, offeringId]);
+  }, [apiUrl, token, offeringId, session]);
   async function save(event: FormEvent) {
     event.preventDefault();
     if (saving || loading || !groups.some(group => group.id === groupId && group.activityType === activity)) return;
     setSaving(true); setError('');
     try {
-      const response = await fetch(apiUrl + '/api/courses/' + courseId + '/sessions', {
-        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      const response = await fetch(session ? apiUrl + '/api/sessions/' + session.id : apiUrl + '/api/courses/' + courseId + '/sessions', {
+        method: session ? 'PUT' : 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ groupId, date, startTime: time })
       });
       if (!response.ok) {
@@ -68,7 +69,7 @@ export function CreateSessionForm({ apiUrl, token, courseId, onCancel, onCreated
     finally { setSaving(false); }
   }
   return <form onSubmit={save}>
-    <h3>Nova sesija</h3>
+    <h3>{session ? 'Izmjena sesije' : 'Nova sesija'}</h3>
     {error && <p role="alert" className="error">{error}</p>}
     {loading && <p role="status">Učitavanje podataka…</p>}
     {!loading && offerings.length === 0 && <p>Predmet nema definisanu akademsku godinu i studijski program.</p>}
@@ -94,7 +95,7 @@ export function CreateSessionForm({ apiUrl, token, courseId, onCancel, onCreated
     <label>Datum<input type="date" required disabled={saving} value={date} onChange={e => setDate(e.target.value)} /></label>
     <label>Vrijeme početka<input type="time" required disabled={saving} value={time} onChange={e => setTime(e.target.value)} /></label>
     <div><button type="submit" disabled={saving || loading || !groupId || !date || !time}>
-      {saving ? 'Čuvanje…' : 'Sačuvaj sesiju'}
+      {saving ? 'Čuvanje…' : session ? 'Sačuvaj izmjene' : 'Sačuvaj sesiju'}
     </button><button type="button" disabled={saving} onClick={onCancel}>Odustani</button></div>
   </form>;
 }
