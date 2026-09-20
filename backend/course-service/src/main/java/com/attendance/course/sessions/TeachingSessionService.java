@@ -3,6 +3,7 @@ package com.attendance.course.sessions;
 import com.attendance.course.CourseRepository;
 import com.attendance.course.TeachingGroup;
 import com.attendance.course.TeachingGroupRepository;
+import com.attendance.course.CourseEmployeeRepository;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -17,13 +18,21 @@ public class TeachingSessionService {
     private final CourseRepository courses;
     private final TeachingGroupRepository groups;
     private final SessionQrService qr;
+    private final CourseEmployeeRepository courseEmployees;
 
     public TeachingSessionService(TeachingSessionRepository sessions, CourseRepository courses,
-            TeachingGroupRepository groups, SessionQrService qr) {
+            TeachingGroupRepository groups, SessionQrService qr, CourseEmployeeRepository courseEmployees) {
         this.sessions = sessions;
         this.courses = courses;
         this.groups = groups;
         this.qr = qr;
+        this.courseEmployees = courseEmployees;
+    }
+
+    @Transactional
+    public SessionResponse create(UUID courseId, SessionRequest request, UUID employeeId) {
+        requireCourseAccess(courseId, employeeId);
+        return create(courseId, request);
     }
 
     @Transactional
@@ -40,8 +49,18 @@ public class TeachingSessionService {
                 .stream().map(SessionResponse::from).toList();
     }
 
+    public List<SessionResponse> findByCourse(UUID courseId, UUID employeeId) {
+        requireCourseAccess(courseId, employeeId);
+        return findByCourse(courseId);
+    }
+
     public SessionResponse findById(UUID id) {
         return SessionResponse.from(sessions.findById(id).orElseThrow(() -> notFound()));
+    }
+
+    public SessionResponse findById(UUID id, UUID employeeId) {
+        requireAccess(id, employeeId);
+        return findById(id);
     }
 
     @Transactional
@@ -54,6 +73,12 @@ public class TeachingSessionService {
     }
 
     @Transactional
+    public SessionResponse update(UUID id, SessionRequest request, UUID employeeId) {
+        requireAccess(id, employeeId);
+        return update(id, request);
+    }
+
+    @Transactional
     public SessionResponse activate(UUID id) {
         TeachingSession session = requireForUpdate(id);
         requireStatus(session, SessionStatus.CREATED, "Samo kreirana sesija može se aktivirati.");
@@ -63,11 +88,35 @@ public class TeachingSessionService {
     }
 
     @Transactional
+    public SessionResponse activate(UUID id, UUID employeeId) {
+        requireAccess(id, employeeId);
+        return activate(id);
+    }
+
+    @Transactional
     public SessionResponse close(UUID id) {
         TeachingSession session = requireForUpdate(id);
         requireStatus(session, SessionStatus.ACTIVE, "Samo aktivna sesija može se zatvoriti.");
         session.close();
         return SessionResponse.from(session);
+    }
+
+    @Transactional
+    public SessionResponse close(UUID id, UUID employeeId) {
+        requireAccess(id, employeeId);
+        return close(id);
+    }
+
+    public void requireAccess(UUID sessionId, UUID employeeId) {
+        if (employeeId == null) return;
+        TeachingSession session = sessions.findById(sessionId).orElseThrow(() -> notFound());
+        requireCourseAccess(session.getCourse().getId(), employeeId);
+    }
+
+    private void requireCourseAccess(UUID courseId, UUID employeeId) {
+        if (employeeId != null && !courseEmployees.existsByCourseIdAndEmployeeId(courseId, employeeId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Nemate pristup sesijama ovog predmeta.");
+        }
     }
 
     private TeachingSession requireForUpdate(UUID id) {

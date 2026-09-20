@@ -18,6 +18,10 @@ select { padding: 11px; border: 1px solid #9badbd; border-radius: 6px; font: inh
 .session-panel label { margin-bottom: 14px; }
 .session-qr { text-align: center; margin-top: 20px; }
 .session-qr img { display: block; width: 100%; max-width: 420px; height: auto; margin: auto; }
+.attendance-panel { margin-top: 24px; display: grid; gap: 14px; }
+.attendance-panel form { margin-top: 8px; }
+.qr-camera { display: block; width: 100%; max-width: 520px; max-height: 390px; margin: 8px auto; border-radius: 8px; background: #101820; }
+.attendance-list { margin-top: 20px; }
 .management-panel { margin-top: 24px; }
 .import-panel { margin-top: 24px; }
 .import-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 18px 0; }
