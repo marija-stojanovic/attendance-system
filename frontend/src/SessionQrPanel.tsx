@@ -4,7 +4,7 @@ import { CreateSessionForm } from './CreateSessionForm';
 type Course = { id: string; code: string; name: string };
 type Session = { id: string; offeringId: string; groupId: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string };
 type Qr = { imageDataUrl: string; pin: string; expiresAt: string; serverTime: string };
-type Attendance = { id: string; studentId: string; firstName: string; lastName: string; indexNumber: string; groupNumber: string; recordedAt: string };
+type Attendance = { id: string; studentId: string; firstName: string; lastName: string; indexNumber: string; groupNumber: string; recordedAt: string; ipAddress: string; userAgent: string };
 const activities: Record<string, string> = {
   LECTURE: 'Predavanje', AUDITORY_EXERCISE: 'Auditorne vježbe', LABORATORY_EXERCISE: 'Laboratorijske vježbe'
 };
@@ -16,6 +16,7 @@ async function request<T>(url: string, token: string, signal: AbortSignal, metho
     const problem = await response.json().catch(() => ({}));
     throw new Error(problem.detail || 'Podaci nisu dostupni. Provjerite prijavu i pokušajte ponovo.');
   }
+  if (response.status === 204) return undefined as T;
   return response.json();
 }
 
@@ -97,6 +98,7 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
   const [editing, setEditing] = useState(false);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
   const [attendanceReload, setAttendanceReload] = useState(0);
+  const [deletingAttendanceId, setDeletingAttendanceId] = useState('');
   const selected = sessions.find(session => session.id === sessionId);
   useEffect(() => {
     const controller = new AbortController();
@@ -142,6 +144,17 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
       setSessions(previous => previous.map(s => s.id === updated.id ? updated : s));
     } catch (e) { setError(e instanceof Error ? e.message : 'Promjena stanja nije uspjela.'); }
     finally { setBusy(false); }
+  }
+  async function removeAttendance(item: Attendance) {
+    if (!selected || !window.confirm(`Ukloniti prisustvo za ${item.firstName} ${item.lastName}?`)) return;
+    setDeletingAttendanceId(item.id);
+    setError('');
+    try {
+      await request<void>(`${apiUrl}/api/sessions/${selected.id}/attendances/${item.id}`, token,
+        new AbortController().signal, 'DELETE');
+      setAttendances(previous => previous.filter(attendance => attendance.id !== item.id));
+    } catch (e) { setError(e instanceof Error ? e.message : 'Uklanjanje prisustva nije uspjelo.'); }
+    finally { setDeletingAttendanceId(''); }
   }
   return <section className="session-panel">
     <h2>Sesije nastave</h2>
@@ -196,9 +209,12 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
         <div className="panel-heading"><h3>Prisutni studenti ({attendances.length})</h3>
           <button disabled={busy} onClick={() => setAttendanceReload(value => value + 1)}>Osvježi</button></div>
         {attendances.length === 0 ? <p>Prisustvo još nije evidentirano.</p> : <div className="table-scroll"><table>
-          <thead><tr><th>Student</th><th>Indeks</th><th>Grupa</th><th>Vrijeme prijave</th></tr></thead>
+          <thead><tr><th>Student</th><th>Indeks</th><th>Grupa</th><th>Vrijeme prijave</th><th>IP adresa</th><th>Uređaj</th><th></th></tr></thead>
           <tbody>{attendances.map(item => <tr key={item.id}><td>{item.lastName} {item.firstName}</td>
-            <td>{item.indexNumber}</td><td>{item.groupNumber}</td><td>{new Date(item.recordedAt).toLocaleString('bs-BA')}</td></tr>)}</tbody>
+            <td>{item.indexNumber}</td><td>{item.groupNumber}</td><td>{new Date(item.recordedAt).toLocaleString('bs-BA')}</td>
+            <td>{item.ipAddress}</td><td className="user-agent-cell" title={item.userAgent}>{item.userAgent}</td>
+            <td><button className="danger-button compact-button" disabled={deletingAttendanceId === item.id}
+              onClick={() => void removeAttendance(item)}>Ukloni</button></td></tr>)}</tbody>
         </table></div>}
       </div>
     </>}

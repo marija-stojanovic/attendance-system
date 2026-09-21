@@ -2,6 +2,8 @@ package com.attendance.course.attendance;
 
 import com.attendance.course.*;
 import com.attendance.course.sessions.*;
+import com.attendance.course.security.LocalUser;
+import com.attendance.course.security.LocalUserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
@@ -25,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties = {
@@ -44,12 +48,16 @@ class AttendanceTests {
     @Autowired private TeachingGroupRepository groups;
     @Autowired private CourseOfferingRepository offerings;
     @Autowired private CourseRepository courses;
+    @Autowired private CourseEmployeeRepository courseEmployees;
+    @Autowired private LocalUserRepository localUsers;
     @MockitoBean private Clock qrClock;
 
     private final Instant start = Instant.parse("2026-10-01T09:00:00Z");
     private Student student;
     private CourseOffering offering;
     private TeachingGroup lecture;
+    private Course course;
+    private LocalUser employee;
 
     @BeforeEach
     void setUp() {
@@ -60,8 +68,13 @@ class AttendanceTests {
         students.deleteAll();
         groups.deleteAll();
         offerings.deleteAll();
+        courseEmployees.deleteAll();
         courses.deleteAll();
-        Course course = courses.saveAndFlush(new Course("ATT-1", "Evidencija prisustva"));
+        localUsers.deleteAll();
+        course = courses.saveAndFlush(new Course("ATT-1", "Evidencija prisustva"));
+        employee = localUsers.saveAndFlush(new LocalUser("attendance-professor", "hash",
+                "attendance.professor@etf.unibl.org", "EMPLOYEE"));
+        courseEmployees.saveAndFlush(new CourseEmployee(course, employee, CourseEmployeeRole.TEACHER));
         offering = offerings.saveAndFlush(new CourseOffering(course,
                 new CreateOfferingRequest("2026/2027", "Računarstvo", "OSNOVNE", (short) 1, (short) 1)));
         lecture = groups.saveAndFlush(new TeachingGroup(offering, ActivityType.LECTURE, "ALL"));
@@ -75,7 +88,11 @@ class AttendanceTests {
         enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
         TeachingSession session = activeSession(lecture);
 
-        mvc.perform(post("/api/student/attendance").with(studentJwt()).contentType("application/json")
+        mvc.perform(post("/api/student/attendance").with(studentJwt()).with(request -> {
+                            request.setRemoteAddr("203.0.113.25");
+                            request.addHeader("User-Agent", "Attendance Test Browser/1.0");
+                            return request;
+                        }).contentType("application/json")
                         .content(body(qr.current(session.getId()).token())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("sessionId").value(session.getId().toString()))
@@ -84,12 +101,75 @@ class AttendanceTests {
                 .andExpect(jsonPath("courseName").value("Evidencija prisustva"))
                 .andExpect(jsonPath("activityType").value("LECTURE"))
                 .andExpect(jsonPath("groupNumber").value("ALL"))
-                .andExpect(jsonPath("recordedAt").value(start.toString()));
+                .andExpect(jsonPath("recordedAt").value(start.toString()))
+                .andExpect(jsonPath("ipAddress").value("203.0.113.25"))
+                .andExpect(jsonPath("userAgent").value("Attendance Test Browser/1.0"));
 
         Attendance saved = attendances.findAll().getFirst();
         assertThat(saved.getStudent().getId()).isEqualTo(student.getId());
         assertThat(saved.getSession().getId()).isEqualTo(session.getId());
         assertThat(saved.getRecordedAt()).isEqualTo(start);
+        assertThat(saved.getIpAddress()).isEqualTo("203.0.113.25");
+        assertThat(saved.getUserAgent()).isEqualTo("Attendance Test Browser/1.0");
+    }
+
+    @Test
+    void employeeCanReviewAndDeleteAttendance() throws Exception {
+        enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
+        TeachingSession session = activeSession(lecture);
+        mvc.perform(post("/api/student/attendance").with(studentJwt()).with(request -> {
+                            request.setRemoteAddr("2001:db8::10");
+                            request.addHeader("User-Agent", "Mobile Browser/2.0");
+                            return request;
+                        }).contentType("application/json")
+                        .content(body(qr.current(session.getId()).token())))
+                .andExpect(status().isOk());
+        UUID attendanceId = attendances.findAll().getFirst().getId();
+
+        mvc.perform(get("/api/sessions/{sessionId}/attendances", session.getId()).with(employeeJwt(employee)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(attendanceId.toString()))
+                .andExpect(jsonPath("$[0].ipAddress").value("2001:db8::10"))
+                .andExpect(jsonPath("$[0].userAgent").value("Mobile Browser/2.0"));
+        mvc.perform(delete("/api/sessions/{sessionId}/attendances/{attendanceId}",
+                        session.getId(), attendanceId).with(employeeJwt(employee)))
+                .andExpect(status().isNoContent());
+        assertThat(attendances.count()).isZero();
+    }
+
+    @Test
+    void employeeCannotReviewOrDeleteAttendanceFromUnassignedCourse() throws Exception {
+        enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
+        TeachingSession session = activeSession(lecture);
+        mvc.perform(post("/api/student/attendance").with(studentJwt()).contentType("application/json")
+                        .content(body(qr.current(session.getId()).token())))
+                .andExpect(status().isOk());
+        UUID attendanceId = attendances.findAll().getFirst().getId();
+        LocalUser other = localUsers.saveAndFlush(new LocalUser("other-professor", "hash",
+                "other.professor@etf.unibl.org", "EMPLOYEE"));
+
+        mvc.perform(get("/api/sessions/{sessionId}/attendances", session.getId()).with(employeeJwt(other)))
+                .andExpect(status().isForbidden());
+        mvc.perform(delete("/api/sessions/{sessionId}/attendances/{attendanceId}",
+                        session.getId(), attendanceId).with(employeeJwt(other)))
+                .andExpect(status().isForbidden());
+        assertThat(attendances.count()).isOne();
+    }
+
+    @Test
+    void employeeCannotDeleteAttendanceUsingDifferentSessionId() throws Exception {
+        enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
+        TeachingSession recordedSession = activeSession(lecture);
+        mvc.perform(post("/api/student/attendance").with(studentJwt()).contentType("application/json")
+                        .content(body(qr.current(recordedSession.getId()).token())))
+                .andExpect(status().isOk());
+        UUID attendanceId = attendances.findAll().getFirst().getId();
+        TeachingSession otherSession = activeSession(lecture);
+
+        mvc.perform(delete("/api/sessions/{sessionId}/attendances/{attendanceId}",
+                        otherSession.getId(), attendanceId).with(employeeJwt(employee)))
+                .andExpect(status().isNotFound());
+        assertThat(attendances.count()).isOne();
     }
 
     @Test
@@ -209,6 +289,11 @@ class AttendanceTests {
                 .claim("identity_issuer", "https://accounts.google.com")
                 .claim("identity_subject", "google-student-1")
                 .claim("email", "marija.stojanovic@student.etf.unibl.org"));
+    }
+
+    private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor employeeJwt(LocalUser user) {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE")).jwt(value ->
+                value.subject(user.getId().toString()).claim("role", "EMPLOYEE").claim("email", user.getEmail()));
     }
 
     private String body(String token) throws Exception {
