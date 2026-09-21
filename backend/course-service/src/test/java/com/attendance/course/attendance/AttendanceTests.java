@@ -12,11 +12,19 @@ import java.time.LocalTime;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
@@ -24,6 +32,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -50,6 +59,7 @@ class AttendanceTests {
     @Autowired private CourseRepository courses;
     @Autowired private CourseEmployeeRepository courseEmployees;
     @Autowired private LocalUserRepository localUsers;
+    @Autowired private JdbcTemplate jdbc;
     @MockitoBean private Clock qrClock;
 
     private final Instant start = Instant.parse("2026-10-01T09:00:00Z");
@@ -201,6 +211,83 @@ class AttendanceTests {
     }
 
     @Test
+    void rejectsPreviousQrAndPinAfterRotation() throws Exception {
+        enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
+        TeachingSession session = activeSession(lecture);
+        var previous = qr.current(session.getId());
+        when(qrClock.instant()).thenReturn(start.plusSeconds(10));
+        var current = qr.current(session.getId());
+
+        mvc.perform(post("/api/student/attendance").with(studentJwt()).contentType("application/json")
+                        .content(body(previous.token())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("detail").value("QR token nije važeći."));
+        mvc.perform(post("/api/student/attendance").with(studentJwt()).contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("pin", previous.pin()))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("detail").value("PIN kod nije važeći."));
+        assertThat(attendances.count()).isZero();
+
+        mvc.perform(post("/api/student/attendance").with(studentJwt()).contentType("application/json")
+                        .content(body(current.token())))
+                .andExpect(status().isOk());
+        assertThat(attendances.count()).isOne();
+    }
+
+    @Test
+    void concurrentAttemptsBySameStudentCreateOneAttendance() throws Exception {
+        enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
+        TeachingSession session = activeSession(lecture);
+        String payload = body(qr.current(session.getId()).token());
+        List<Integer> statuses = concurrentRequests(8, number ->
+                mvc.perform(post("/api/student/attendance").with(studentJwt())
+                        .contentType("application/json").content(payload))
+                        .andReturn().getResponse().getStatus());
+
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409, 409, 409, 409, 409, 409, 409);
+        assertThat(attendances.count()).isOne();
+    }
+
+    @Test
+    void concurrentAttemptsByDifferentStudentsKeepEveryAttendance() throws Exception {
+        int numberOfStudents = 50;
+        for (int number = 1; number < numberOfStudents; number++) {
+            Student other = new Student("LOAD-" + number + "/26", "Student", "Test" + number,
+                    "student" + number + "@student.etf.unibl.org");
+            other.linkIdentity("https://accounts.google.com", "google-student-" + (number + 1));
+            enrollments.saveAndFlush(new Enrollment(students.saveAndFlush(other), offering, "REDOVAN", Set.of()));
+        }
+        enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
+        TeachingSession session = activeSession(lecture);
+        String payload = body(qr.current(session.getId()).token());
+        List<Integer> statuses = concurrentRequests(numberOfStudents, number ->
+                mvc.perform(post("/api/student/attendance").with(studentJwt("google-student-" + (number + 1)))
+                        .contentType("application/json").content(payload))
+                        .andReturn().getResponse().getStatus());
+
+        assertThat(statuses).containsOnly(200).hasSize(numberOfStudents);
+        assertThat(attendances.count()).isEqualTo(numberOfStudents);
+        assertThat(attendances.findAll()).extracting(item -> item.getStudent().getId()).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void databaseRejectsDuplicateStudentAndSession() throws Exception {
+        enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
+        TeachingSession session = activeSession(lecture);
+        mvc.perform(post("/api/student/attendance").with(studentJwt()).contentType("application/json")
+                        .content(body(qr.current(session.getId()).token())))
+                .andExpect(status().isOk());
+
+        assertThatThrownBy(() -> jdbc.update("""
+                insert into attendances (id, teaching_session_id, student_id, recorded_at, ip_address, user_agent)
+                values (?, ?, ?, ?, ?, ?)
+                """, UUID.randomUUID(), session.getId(), student.getId(),
+                java.sql.Timestamp.from(start), "203.0.113.10", "Test Browser"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(attendances.count()).isOne();
+    }
+
+    @Test
     void rejectsStudentWhoIsNotEnrolledInSessionOffering() throws Exception {
         TeachingSession session = activeSession(lecture);
         mvc.perform(post("/api/student/attendance").with(studentJwt()).contentType("application/json")
@@ -285,10 +372,40 @@ class AttendanceTests {
     }
 
     private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor studentJwt() {
+        return studentJwt("google-student-1");
+    }
+
+    private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor studentJwt(String subject) {
         return jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT")).jwt(value -> value.claim("role", "STUDENT")
                 .claim("identity_issuer", "https://accounts.google.com")
-                .claim("identity_subject", "google-student-1")
-                .claim("email", "marija.stojanovic@student.etf.unibl.org"));
+                .claim("identity_subject", subject));
+    }
+
+    private List<Integer> concurrentRequests(int count, AttendanceRequestAction request)
+            throws Exception {
+        CountDownLatch ready = new CountDownLatch(count);
+        CountDownLatch startSignal = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(count)) {
+            List<Future<Integer>> futures = new ArrayList<>();
+            for (int number = 0; number < count; number++) {
+                final int studentNumber = number;
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    if (!startSignal.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("Zahtjevi nisu spremni.");
+                    return request.send(studentNumber);
+                }));
+            }
+            if (!ready.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("Zahtjevi nisu spremni.");
+            startSignal.countDown();
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> future : futures) statuses.add(future.get(90, TimeUnit.SECONDS));
+            return statuses;
+        }
+    }
+
+    @FunctionalInterface
+    private interface AttendanceRequestAction {
+        int send(int number) throws Exception;
     }
 
     private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor employeeJwt(LocalUser user) {
