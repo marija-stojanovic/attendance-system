@@ -35,6 +35,8 @@ th, td { padding: 9px; border: 1px solid #c7d5e0; text-align: left; white-space:
 th { background: #dfeaf3; }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .panel-heading h2, .panel-heading h3 { margin-bottom: 4px; }
+.live-status, .update-time { display: block; margin-top: 4px; font-size: 13px; color: #53697d; }
+.live-status::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #218739; }
 .course-layout { margin-top: 18px; }
 .course-picker { display: flex; align-items: end; gap: 12px; margin-top: 16px; }
 .course-picker label { flex: 1; }
