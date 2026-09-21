@@ -288,6 +288,35 @@ class AttendanceTests {
     }
 
     @Test
+    void retryAfterLostResponseReturnsSavedAttendanceEvenAfterQrRotation() throws Exception {
+        enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
+        TeachingSession session = activeSession(lecture);
+        String oldToken = qr.current(session.getId()).token();
+        UUID requestId = UUID.randomUUID();
+        String payload = json.writeValueAsString(Map.of("token", oldToken, "requestId", requestId));
+
+        String first = mvc.perform(post("/api/student/attendance").with(studentJwt())
+                        .contentType("application/json").content(payload))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        when(qrClock.instant()).thenReturn(start.plusSeconds(10));
+        mvc.perform(post("/api/student/attendance").with(studentJwt())
+                        .contentType("application/json").content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("id").value(json.readTree(first).get("id").asText()))
+                .andExpect(jsonPath("recordedAt").value(start.toString()));
+        assertThat(attendances.count()).isOne();
+
+        String newToken = qr.current(session.getId()).token();
+        mvc.perform(post("/api/student/attendance").with(studentJwt())
+                        .contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("token", newToken,
+                                "requestId", UUID.randomUUID()))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("code").value("ATTENDANCE_ALREADY_RECORDED"));
+        assertThat(attendances.count()).isOne();
+    }
+
+    @Test
     void rejectsStudentWhoIsNotEnrolledInSessionOffering() throws Exception {
         TeachingSession session = activeSession(lecture);
         mvc.perform(post("/api/student/attendance").with(studentJwt()).contentType("application/json")

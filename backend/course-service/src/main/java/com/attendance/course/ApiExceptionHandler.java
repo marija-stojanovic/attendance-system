@@ -1,10 +1,13 @@
 package com.attendance.course;
 
+import com.attendance.course.attendance.DuplicateAttendanceException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -31,11 +34,21 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(ResponseStatusException.class)
     public ProblemDetail handleStatus(ResponseStatusException exception) {
-        return ProblemDetail.forStatusAndDetail(exception.getStatusCode(), exception.getReason());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(exception.getStatusCode(), exception.getReason());
+        if (exception instanceof DuplicateAttendanceException) {
+            problem.setProperty("code", "ATTENDANCE_ALREADY_RECORDED");
+        }
+        return problem;
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail handleConflict(DataIntegrityViolationException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "Uneseni podaci su u sukobu sa postojećim podacima.");
+    }
+
+    @ExceptionHandler({DataAccessException.class, CannotCreateTransactionException.class})
+    public ProblemDetail handleDatabaseUnavailable(Exception exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                "Baza trenutno nije dostupna. Pokušajte ponovo.");
     }
 }

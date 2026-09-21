@@ -90,7 +90,8 @@ public class SessionQrService {
                     + URLEncoder.encode(token, StandardCharsets.UTF_8);
             return new QrResponse(session.getId(), token, pin(session, issuedAt), image(scanUrl), scanUrl, expiresAt, now);
         } catch (JOSEException exception) {
-            throw new IllegalStateException("Generisanje QR tokena nije uspjelo.", exception);
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "QR kod trenutno nije dostupan.", exception);
         }
     }
 
@@ -156,7 +157,8 @@ public class SessionQrService {
             ImageIO.write(image, "png", output);
             return "data:image/png;base64," + Base64.getEncoder().encodeToString(output.toByteArray());
         } catch (java.io.IOException | com.google.zxing.WriterException exception) {
-            throw new IllegalStateException("Generisanje QR slike nije uspjelo.", exception);
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "QR kod trenutno nije dostupan.", exception);
         }
     }
 

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AttendanceRepository extends JpaRepository<Attendance, UUID> {
     boolean existsBySessionIdAndStudentId(UUID sessionId, UUID studentId);
+    Optional<Attendance> findByRequestIdAndStudentId(UUID requestId, UUID studentId);
 
     List<Attendance> findBySessionIdOrderByRecordedAtAscStudentLastNameAscStudentFirstNameAsc(UUID sessionId);
     Optional<Attendance> findByIdAndSessionId(UUID id, UUID sessionId);

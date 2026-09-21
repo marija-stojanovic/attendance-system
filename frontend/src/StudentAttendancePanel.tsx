@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { AttendanceAttempt, AttendanceOutcome, sendAttendance } from './attendanceRequest';
 
-type Result = { courseCode: string; courseName: string; activityType: string; groupNumber: string; recordedAt: string };
 type DetectedCode = { rawValue: string };
 type Detector = { detect(source: HTMLVideoElement): Promise<DetectedCode[]> };
 type DetectorConstructor = new (options: { formats: string[] }) => Detector;
@@ -13,12 +13,12 @@ export function StudentAttendancePanel({ apiUrl, token }: { apiUrl: string; toke
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const frame = useRef(0);
-  const [qrToken, setQrToken] = useState('');
+  const sending = useRef(false);
+  const pendingAttempt = useRef<AttendanceAttempt | null>(null);
   const [pin, setPin] = useState('');
   const [scanning, setScanning] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [result, setResult] = useState<Result | null>(null);
+  const [pending, setPending] = useState(false);
+  const [outcome, setOutcome] = useState<AttendanceOutcome | null>(null);
 
   function stop() {
     cancelAnimationFrame(frame.current);
@@ -35,8 +35,7 @@ export function StudentAttendancePanel({ apiUrl, token }: { apiUrl: string; toke
     const url = new URL(window.location.href);
     url.searchParams.delete('attendanceToken');
     window.history.replaceState({}, '', url.pathname + url.search + url.hash);
-    setQrToken(value);
-    void submit(value);
+    void submit({ token: value, pin: null, requestId: crypto.randomUUID() });
   }, []);
 
   function tokenFrom(value: string) {
@@ -45,44 +44,57 @@ export function StudentAttendancePanel({ apiUrl, token }: { apiUrl: string; toke
     catch { return trimmed; }
   }
 
-  async function submit(value: string) {
-    const attendanceToken = tokenFrom(value);
-    if (!attendanceToken || saving) return;
-    setSaving(true); setError(''); setResult(null);
+  async function submit(attempt: AttendanceAttempt) {
+    if (sending.current) return;
+    sending.current = true;
+    pendingAttempt.current = attempt;
+    setPending(true);
+    setOutcome(null);
     try {
-      const response = await fetch(apiUrl + '/api/student/attendance', {
-        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: attendanceToken, pin: null })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.detail || 'Prisustvo nije moguće evidentirati.');
-      setResult(data); setQrToken(''); stop();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Prisustvo nije moguće evidentirati.'); }
-    finally { setSaving(false); }
+      const response = await sendAttendance(apiUrl, token, attempt);
+      setOutcome(response);
+      if (response.kind === 'success' || response.kind === 'already-recorded' || response.kind === 'rejected') {
+        pendingAttempt.current = null;
+        setPending(false);
+      }
+      if (response.kind === 'success' || response.kind === 'already-recorded') {
+        setPin('');
+        stop();
+      }
+    } finally {
+      sending.current = false;
+    }
   }
 
-  async function submitPin() {
-    if (!/^\d{6}$/.test(pin) || saving) return;
-    setSaving(true); setError(''); setResult(null);
-    try {
-      const response = await fetch(apiUrl + '/api/student/attendance', {
-        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: null, pin })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.detail || 'Prisustvo nije moguće evidentirati.');
-      setResult(data); setPin(''); stop();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Prisustvo nije moguće evidentirati.'); }
-    finally { setSaving(false); }
+  function submitToken(value: string) {
+    const attendanceToken = tokenFrom(value);
+    if (!attendanceToken || pendingAttempt.current || sending.current) return;
+    void submit({ token: attendanceToken, pin: null, requestId: crypto.randomUUID() });
+  }
+
+  function submitPin() {
+    if (!/^\d{6}$/.test(pin) || pendingAttempt.current || sending.current) return;
+    void submit({ token: null, pin, requestId: crypto.randomUUID() });
+  }
+
+  function abandon() {
+    pendingAttempt.current = null;
+    setPending(false);
+    setPin('');
+    setOutcome(null);
   }
 
   async function start() {
-    setError(''); setResult(null);
+    if (pending || sending.current) return;
+    setOutcome(null);
     const BarcodeDetector = (window as Window & { BarcodeDetector?: DetectorConstructor }).BarcodeDetector;
-    if (!BarcodeDetector) { setError('Ovaj preglednik ne podržava skeniranje kamerom. Unesite QR token ručno.'); return; }
+    if (!BarcodeDetector) {
+      setOutcome({ kind: 'rejected', message: 'Ovaj preglednik ne podržava skeniranje kamerom. Unesite PIN kod.' });
+      return;
+    }
     try {
       stream.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      if (!video.current) return;
+      if (!video.current) { stop(); return; }
       video.current.srcObject = stream.current;
       await video.current.play();
       setScanning(true);
@@ -91,28 +103,40 @@ export function StudentAttendancePanel({ apiUrl, token }: { apiUrl: string; toke
         if (!video.current || !stream.current) return;
         try {
           const codes = await detector.detect(video.current);
-          if (codes[0]?.rawValue) { await submit(codes[0].rawValue); return; }
+          if (codes[0]?.rawValue) { stop(); submitToken(codes[0].rawValue); return; }
         } catch {}
         frame.current = requestAnimationFrame(scan);
       };
       frame.current = requestAnimationFrame(scan);
-    } catch { stop(); setError('Kamera nije dostupna. Provjerite dozvolu preglednika ili unesite token ručno.'); }
+    } catch {
+      stop();
+      setOutcome({ kind: 'rejected', message: 'Kamera nije dostupna. Provjerite dozvolu preglednika ili unesite PIN kod.' });
+    }
   }
 
   return <section className="attendance-panel">
     <h2>Evidencija prisustva</h2>
     <p>Skenirajte QR kod ili unesite šestocifreni PIN koji je prikazao zaposleni.</p>
-    {!scanning && <button disabled={saving} onClick={() => void start()}>Pokreni kameru</button>}
+    {!scanning && <button disabled={pending} onClick={() => void start()}>Pokreni kameru</button>}
     <video ref={video} className="qr-camera" muted playsInline hidden={!scanning} />
     {scanning && <button onClick={stop}>Zaustavi kameru</button>}
-    <form onSubmit={(event: FormEvent) => { event.preventDefault(); void submitPin(); }}>
+    <form onSubmit={(event: FormEvent) => { event.preventDefault(); submitPin(); }}>
       <label>PIN kod<input inputMode="numeric" autoComplete="one-time-code" value={pin}
-        onChange={event => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))} maxLength={6} /></label>
-      <button disabled={saving || !/^\d{6}$/.test(pin)} type="submit">{saving ? 'Provjera…' : 'Evidentiraj prisustvo'}</button>
+        disabled={pending} onChange={event => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))} maxLength={6} /></label>
+      <button disabled={pending || !/^\d{6}$/.test(pin)} type="submit">Evidentiraj prisustvo</button>
     </form>
-    {error && <p className="error" role="alert">{error}</p>}
-    {result && <div className="success"><strong>Prisustvo je evidentirano.</strong><br />
-      {result.courseCode} — {result.courseName}<br />{activities[result.activityType]} — grupa {result.groupNumber}<br />
-      Vrijeme prijave: {new Date(result.recordedAt).toLocaleString('bs-BA')}</div>}
+    {pending && !outcome && <p role="status">Provjera prisustva je u toku…</p>}
+    {outcome?.kind === 'success' && <div className="success" role="status"><strong>Prisustvo je evidentirano.</strong><br />
+      {outcome.result.courseCode} — {outcome.result.courseName}<br />
+      {activities[outcome.result.activityType]} — grupa {outcome.result.groupNumber}<br />
+      Vrijeme prijave: {new Date(outcome.result.recordedAt).toLocaleString('bs-BA')}</div>}
+    {outcome?.kind === 'already-recorded' && <p className="success" role="status">{outcome.message}</p>}
+    {outcome?.kind === 'rejected' && <p className="error" role="alert">{outcome.message}</p>}
+    {outcome && (outcome.kind === 'network-error' || outcome.kind === 'timeout' || outcome.kind === 'unavailable') &&
+    <div className="notice" role="alert">
+      <p>{outcome.message} Nemojte skenirati novi kod prije provjere ovog pokušaja.</p>
+      <button type="button" onClick={() => { if (pendingAttempt.current) void submit(pendingAttempt.current); }}>Pokušaj ponovo</button>
+      <button type="button" onClick={abandon}>Odustani od pokušaja</button>
+    </div>}
   </section>;
 }
