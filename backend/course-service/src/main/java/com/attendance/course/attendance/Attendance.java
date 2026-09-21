@@ -25,17 +25,28 @@ public class Attendance {
     @Column(name = "recorded_at", nullable = false, updatable = false)
     private Instant recordedAt;
 
+    @Column(name = "ip_address", nullable = false, updatable = false, length = 45)
+    private String ipAddress;
+
+    @Column(name = "user_agent", nullable = false, updatable = false, length = 512)
+    private String userAgent;
+
     protected Attendance() {
     }
 
-    public Attendance(TeachingSession session, Student student, Instant recordedAt) {
+    public Attendance(TeachingSession session, Student student, Instant recordedAt,
+            String ipAddress, String userAgent) {
         this.session = session;
         this.student = student;
         this.recordedAt = recordedAt;
+        this.ipAddress = ipAddress;
+        this.userAgent = userAgent;
     }
 
     public UUID getId() { return id; }
     public TeachingSession getSession() { return session; }
     public Student getStudent() { return student; }
     public Instant getRecordedAt() { return recordedAt; }
+    public String getIpAddress() { return ipAddress; }
+    public String getUserAgent() { return userAgent; }
 }

@@ -37,17 +37,21 @@ public class AttendanceService {
 
     @Transactional(readOnly = true)
     public List<AttendanceListResponse> findBySession(UUID sessionId, UUID employeeId) {
-        TeachingSession session = sessions.findById(sessionId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Sesija nije pronađena."));
-        if (!courseEmployees.existsByCourseIdAndEmployeeId(session.getCourse().getId(), employeeId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Nemate pristup sesijama ovog predmeta.");
-        }
+        requireEmployeeAccess(sessionId, employeeId);
         return attendances.findBySessionIdOrderByRecordedAtAscStudentLastNameAscStudentFirstNameAsc(sessionId)
                 .stream().map(AttendanceListResponse::from).toList();
     }
 
     @Transactional
-    public AttendanceResponse record(Jwt jwt, String token, String pin) {
+    public void delete(UUID sessionId, UUID attendanceId, UUID employeeId) {
+        requireEmployeeAccess(sessionId, employeeId);
+        Attendance attendance = attendances.findByIdAndSessionId(attendanceId, sessionId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Evidencija prisustva nije pronađena."));
+        attendances.delete(attendance);
+    }
+
+    @Transactional
+    public AttendanceResponse record(Jwt jwt, String token, String pin, AttendanceClientDetails client) {
         boolean hasToken = token != null && !token.isBlank();
         boolean hasPin = pin != null && !pin.isBlank();
         if (hasToken == hasPin) {
@@ -75,11 +79,21 @@ public class AttendanceService {
             throw duplicate();
         }
         try {
-            Attendance attendance = attendances.saveAndFlush(new Attendance(session, student, qr.now()));
+            Attendance attendance = attendances.saveAndFlush(new Attendance(session, student, qr.now(),
+                    client.ipAddress(), client.userAgent()));
             return AttendanceResponse.from(attendance);
         } catch (DataIntegrityViolationException exception) {
             throw duplicate();
         }
+    }
+
+    private TeachingSession requireEmployeeAccess(UUID sessionId, UUID employeeId) {
+        TeachingSession session = sessions.findById(sessionId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Sesija nije pronađena."));
+        if (!courseEmployees.existsByCourseIdAndEmployeeId(session.getCourse().getId(), employeeId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Nemate pristup sesijama ovog predmeta.");
+        }
+        return session;
     }
 
     private ResponseStatusException duplicate() {

@@ -1,6 +1,7 @@
 package com.attendance.course.attendance;
 
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -15,7 +16,8 @@ public class AttendanceController {
     }
 
     @PostMapping
-    public AttendanceResponse record(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody AttendanceRequest request) {
-        return attendance.record(jwt, request.token(), request.pin());
+    public AttendanceResponse record(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody AttendanceRequest request,
+            HttpServletRequest servletRequest) {
+        return attendance.record(jwt, request.token(), request.pin(), AttendanceClientDetails.from(servletRequest));
     }
 }
