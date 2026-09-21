@@ -51,21 +51,30 @@ public class AttendanceService {
     }
 
     @Transactional
-    public AttendanceResponse record(Jwt jwt, String token, String pin, AttendanceClientDetails client) {
+    public AttendanceResponse record(Jwt jwt, String token, String pin, UUID requestId,
+            AttendanceClientDetails client) {
         boolean hasToken = token != null && !token.isBlank();
         boolean hasPin = pin != null && !pin.isBlank();
         if (hasToken == hasPin) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Pošaljite QR token ili PIN kod.");
+        }
+        Student student = students.findByOidcIssuerAndOidcSubject(
+                jwt.getClaimAsString("identity_issuer"), jwt.getClaimAsString("identity_subject"))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Studentski nalog nije povezan sa evidencijom."));
+        if (requestId != null) {
+            var saved = attendances.findByRequestIdAndStudentId(requestId, student.getId());
+            if (saved.isPresent()) return AttendanceResponse.from(saved.get());
         }
         UUID sessionId = hasToken ? qr.validate(token) : qr.validatePin(pin);
         TeachingSession session = sessions.findForUpdate(sessionId).orElseThrow(() -> invalidQr());
         if (session.getStatus() != SessionStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Sesija više nije aktivna.");
         }
-        Student student = students.findByOidcIssuerAndOidcSubject(
-                jwt.getClaimAsString("identity_issuer"), jwt.getClaimAsString("identity_subject"))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        "Studentski nalog nije povezan sa evidencijom."));
+        if (requestId != null) {
+            var saved = attendances.findByRequestIdAndStudentId(requestId, student.getId());
+            if (saved.isPresent()) return AttendanceResponse.from(saved.get());
+        }
         Enrollment enrollment = enrollments.findFirstByStudentIdAndOfferingId(
                 student.getId(), session.getGroup().getOffering().getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -80,7 +89,7 @@ public class AttendanceService {
         }
         try {
             Attendance attendance = attendances.saveAndFlush(new Attendance(session, student, qr.now(),
-                    client.ipAddress(), client.userAgent()));
+                    client.ipAddress(), client.userAgent(), requestId));
             return AttendanceResponse.from(attendance);
         } catch (DataIntegrityViolationException exception) {
             throw duplicate();
@@ -97,8 +106,7 @@ public class AttendanceService {
     }
 
     private ResponseStatusException duplicate() {
-        return new ResponseStatusException(HttpStatus.CONFLICT,
-                "Prisustvo studenta je već evidentirano za ovu sesiju.");
+        return new DuplicateAttendanceException();
     }
 
     private ResponseStatusException invalidQr() {
