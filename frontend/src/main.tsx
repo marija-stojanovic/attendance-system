@@ -27,9 +27,9 @@ function App() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [courseRefresh, setCourseRefresh] = useState(0);
-  const [importedCourseId, setImportedCourseId] = useState('');
-  const [importedOfferingId, setImportedOfferingId] = useState('');
-  const [previewingImport, setPreviewingImport] = useState(false);
+  const [employeeView, setEmployeeView] = useState<'courses' | 'import' | 'sessions'>('courses');
+  const [importMessage, setImportMessage] = useState('');
+  const [importPreviewOpen, setImportPreviewOpen] = useState(false);
 
   async function loadIdentity(accessToken: string) {
     setLoading(true);
@@ -117,31 +117,53 @@ function App() {
     setIdentity(null);
     setRegistration(null);
     setError('');
+    setEmployeeView('courses');
+    setImportMessage('');
+    setImportPreviewOpen(false);
+  }
+
+  function openEmployeeView(view: 'courses' | 'import' | 'sessions') {
+    if (employeeView === 'import' && view !== 'import' && importPreviewOpen
+        && !window.confirm('Učitani fajl nije sačuvan. Napustiti uvoz?')) return;
+    if (view !== 'import') setImportPreviewOpen(false);
+    if (view === 'import') setImportMessage('');
+    setEmployeeView(view);
   }
 
   return <main>
-    <p className="label">EVIDENCIJA PRISUSTVA</p>
-    <h1>Dobro došli</h1>
+    <h1>Evidencija prisustva</h1>
     {error && <p role="alert" className="error">{error}</p>}
     {token ? <>
       {loading && <p role="status">Provjera naloga…</p>}
-      {identity && <section><h2>Vaš nalog</h2><p>{identity.email}</p>
-        <p>Uloga: {identity.role === 'EMPLOYEE' ? 'Zaposleni' : 'Student'}</p>
-        {identity.studentId && <p>Nalog je povezan sa studentskom evidencijom.</p>}
-      </section>}
-      <button disabled={loading} onClick={() => void loadIdentity(token)}>Provjeri nalog</button>
-      <button onClick={logout}>Odjavi se</button>
+      <div className="account-bar"><span>{identity
+        ? `${identity.email} · ${identity.role === 'EMPLOYEE' ? 'Zaposleni' : 'Student'}`
+        : 'Podaci o nalogu nisu učitani.'}</span>
+        <button type="button" className="secondary-button" onClick={logout}>Odjavi se</button></div>
       {identity?.role === 'STUDENT' && <><StudentAttendancePanel apiUrl={apiUrl} token={token} />
         <StudentCoursesPanel apiUrl={apiUrl} token={token} /></>}
       {identity?.role === 'EMPLOYEE' && <>
-        <CourseImportPanel apiUrl={apiUrl} token={token} onPreviewChange={setPreviewingImport} onImported={result => {
-          setImportedCourseId(result.courseId);
-          setImportedOfferingId(result.offeringId);
+        <nav className="employee-nav" aria-label="Rad sa predmetima">
+          <button type="button" className={employeeView === 'courses' ? 'active' : ''}
+            aria-current={employeeView === 'courses' ? 'page' : undefined}
+            onClick={() => openEmployeeView('courses')}>Predmeti</button>
+          <button type="button" className={employeeView === 'import' ? 'active' : ''}
+            aria-current={employeeView === 'import' ? 'page' : undefined}
+            onClick={() => openEmployeeView('import')}>Uvoz liste</button>
+          <button type="button" className={employeeView === 'sessions' ? 'active' : ''}
+            aria-current={employeeView === 'sessions' ? 'page' : undefined}
+            onClick={() => openEmployeeView('sessions')}>Sesije</button>
+        </nav>
+        {employeeView === 'courses' && <>
+          {importMessage && <p className="success" role="status">{importMessage}</p>}
+          <CourseManagementPanel apiUrl={apiUrl} token={token} refreshKey={courseRefresh} />
+        </>}
+        {employeeView === 'import' && <CourseImportPanel apiUrl={apiUrl} token={token}
+          onPreviewChange={setImportPreviewOpen} onImported={result => {
           setCourseRefresh(value => value + 1);
-        }} />
-        {!previewingImport && <CourseManagementPanel apiUrl={apiUrl} token={token} refreshKey={courseRefresh}
-          importedCourseId={importedCourseId} importedOfferingId={importedOfferingId} />}
-        <SessionQrPanel apiUrl={apiUrl} token={token} />
+          setImportMessage(`Uvoz je sačuvan: ${result.enrollmentsCreated} novih upisa, ${result.groupsCreated} novih grupa. Izaberite predmet i kliknite „Učitaj predmet” za pregled.`);
+          setEmployeeView('courses');
+        }} />}
+        {employeeView === 'sessions' && <SessionQrPanel apiUrl={apiUrl} token={token} />}
       </>}
     </> : registration ? <section>
       <h2>Završetak registracije</h2>

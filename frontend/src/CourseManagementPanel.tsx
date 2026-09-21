@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-type Props = { apiUrl: string; token: string; refreshKey?: number; importedCourseId?: string; importedOfferingId?: string };
+type Props = { apiUrl: string; token: string; refreshKey?: number };
 type Course = { id: string; code: string; name: string };
 type Offering = {
   id: string;
@@ -28,8 +28,10 @@ const activityNames: Record<string, string> = {
 };
 const activityOrder = ['LECTURE', 'AUDITORY_EXERCISE', 'LABORATORY_EXERCISE'];
 
-export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedCourseId = '', importedOfferingId = '' }: Props) {
+export function CourseManagementPanel({ apiUrl, token, refreshKey = 0 }: Props) {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(true);
+  const [courseToLoadId, setCourseToLoadId] = useState('');
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [offerings, setOfferings] = useState<Offering[]>([]);
   const [selectedOfferingId, setSelectedOfferingId] = useState('');
@@ -38,6 +40,7 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
+  const [showAllStudents, setShowAllStudents] = useState(false);
   const [groupSettings, setGroupSettings] = useState<GroupSettings[]>([]);
   const [settingsForms, setSettingsForms] = useState<Record<string, SettingsForm>>({});
   const [savingSettings, setSavingSettings] = useState('');
@@ -68,6 +71,7 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
       return matchesSearch && matchesGroup;
     });
   }, [enrollments, studentSearch, groupFilter]);
+  const displayedEnrollments = showAllStudents ? visibleEnrollments : visibleEnrollments.slice(0, 25);
 
   async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(apiUrl + path, {
@@ -82,17 +86,20 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
   }
 
   useEffect(() => {
+    let active = true;
+    setCoursesLoading(true);
     request<Course[]>('/api/courses').then(result => {
+      if (!active) return;
       setCourses(result);
-      setSelectedCourseId(current => {
-        if (importedCourseId && result.some(course => course.id === importedCourseId)) return importedCourseId;
-        if (current && result.some(course => course.id === current)) return current;
-        return result[0]?.id || '';
-      });
-    }).catch(e => setError(e instanceof Error ? e.message : 'Predmeti nisu dostupni.'));
-  }, [token, refreshKey, importedCourseId, localRefresh]);
+      setCourseToLoadId(current => result.some(course => course.id === current) ? current : '');
+      setSelectedCourseId(current => result.some(course => course.id === current) ? current : '');
+    }).catch(e => { if (active) setError(e instanceof Error ? e.message : 'Predmeti nisu dostupni.'); })
+      .finally(() => { if (active) setCoursesLoading(false); });
+    return () => { active = false; };
+  }, [token, refreshKey, localRefresh]);
 
   useEffect(() => {
+    let active = true;
     setOfferings([]);
     setEmployees([]);
     setSelectedOfferingId('');
@@ -106,19 +113,21 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
       request<Offering[]>('/api/courses/' + selectedCourseId + '/offerings'),
       request<CourseEmployee[]>('/api/courses/' + selectedCourseId + '/employees')
     ]).then(([loadedOfferings, loadedEmployees]) => {
+      if (!active) return;
       setOfferings(loadedOfferings);
       setEmployees(loadedEmployees);
-      const preferredOffering = importedOfferingId && loadedOfferings.some(offering => offering.id === importedOfferingId)
-        ? importedOfferingId : loadedOfferings[0]?.id || '';
-      setSelectedOfferingId(preferredOffering);
-    }).catch(e => setError(e instanceof Error ? e.message : 'Detalji predmeta nisu dostupni.'));
-  }, [selectedCourseId, refreshKey, importedOfferingId]);
+      setSelectedOfferingId(loadedOfferings[0]?.id || '');
+    }).catch(e => { if (active) setError(e instanceof Error ? e.message : 'Detalji predmeta nisu dostupni.'); });
+    return () => { active = false; };
+  }, [selectedCourseId, refreshKey]);
 
   useEffect(() => {
+    let active = true;
     setGroups([]);
     setEnrollments([]);
     setStudentSearch('');
     setGroupFilter('');
+    setShowAllStudents(false);
     if (!selectedOfferingId) return;
 
     Promise.all([
@@ -126,6 +135,7 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
       request<Enrollment[]>('/api/offerings/' + selectedOfferingId + '/students'),
       request<GroupSettings[]>('/api/offerings/' + selectedOfferingId + '/group-settings')
     ]).then(([loadedGroups, loadedEnrollments, loadedSettings]) => {
+      if (!active) return;
       setGroups(loadedGroups);
       setEnrollments(loadedEnrollments);
       setGroupSettings(loadedSettings);
@@ -134,7 +144,8 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
         groupCapacity: setting.configured ? Math.min(...setting.groups.map(group => group.capacity)) : '',
         selectionEnabled: setting.selectionEnabled
       }])));
-    }).catch(e => setError(e instanceof Error ? e.message : 'Podaci izvođenja nisu dostupni.'));
+    }).catch(e => { if (active) setError(e instanceof Error ? e.message : 'Podaci izvođenja nisu dostupni.'); });
+    return () => { active = false; };
   }, [selectedOfferingId, offeringRefresh]);
 
   async function saveGroupSettings(activityType: string) {
@@ -172,6 +183,7 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
     try {
       await request<void>('/api/courses/' + selectedCourse.id, { method: 'DELETE' });
       setSelectedCourseId('');
+      setCourseToLoadId('');
       setLocalRefresh(value => value + 1);
     } catch (e) { setError(e instanceof Error ? e.message : 'Predmet nije obrisan.'); }
     finally { setDeleting(false); }
@@ -196,14 +208,14 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
               className={groupFilter === group.id ? 'group-chip active' : 'group-chip'}
               key={group.id}
               type="button"
-              onClick={() => setGroupFilter(current => current === group.id ? '' : group.id)}
+              onClick={() => { setGroupFilter(current => current === group.id ? '' : group.id); setShowAllStudents(false); }}
             >{group.groupNumber}</button>)}
           </div>}
         </div>)}
       </div>
 
-      {selectedOffering.yearOfStudy > 1 && <div className="group-management">
-        <h3>Formiranje grupa</h3>
+      {selectedOffering.yearOfStudy > 1 && <details className="group-management">
+        <summary>Formiranje grupa</summary>
         <p>Unesite broj grupa i kapacitet jedne grupe za izabranu vrstu vježbi.</p>
         <div className="group-settings-grid">{groupSettings.map(setting => {
           const form = settingsForms[setting.activityType];
@@ -223,13 +235,13 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
               onClick={() => void saveGroupSettings(setting.activityType)}>Sačuvaj grupe</button>
           </div>;
         })}</div>
-      </div>}
+      </details>}
 
       <div className="students-panel">
-        <div className="panel-heading"><h3>Studenti ({enrollments.length})</h3><span>Prikazano: {visibleEnrollments.length}</span></div>
+        <div className="panel-heading"><h3>Studenti ({enrollments.length})</h3><span>Prikazano: {displayedEnrollments.length} od {visibleEnrollments.length}</span></div>
         <div className="student-filters">
-          <label>Pretraga<input value={studentSearch} onChange={event => setStudentSearch(event.target.value)} placeholder="Ime, indeks ili e-mail" /></label>
-          <label>Grupa<select value={groupFilter} onChange={event => setGroupFilter(event.target.value)}>
+          <label>Pretraga<input value={studentSearch} onChange={event => { setStudentSearch(event.target.value); setShowAllStudents(false); }} placeholder="Ime, indeks ili e-mail" /></label>
+          <label>Grupa<select value={groupFilter} onChange={event => { setGroupFilter(event.target.value); setShowAllStudents(false); }}>
             <option value="">Sve grupe</option>
             {activityOrder.flatMap(activityType => (groupsByActivity[activityType] || []).map(group => <option key={group.id} value={group.id}>
               {activityNames[activityType]} — {group.groupNumber}
@@ -239,7 +251,7 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
         </div>
         {visibleEnrollments.length === 0 ? <p>Nema studenata za izabrane kriterijume.</p> : <div className="table-scroll"><table>
           <thead><tr><th>Indeks</th><th>Prezime i ime</th><th>E-mail</th><th>Status</th><th>Grupe</th></tr></thead>
-          <tbody>{visibleEnrollments.map(enrollment => <tr key={enrollment.id}>
+          <tbody>{displayedEnrollments.map(enrollment => <tr key={enrollment.id}>
             <td>{enrollment.student.indexNumber}</td>
             <td>{enrollment.student.lastName} {enrollment.student.firstName}</td>
             <td>{enrollment.student.institutionalEmail}</td>
@@ -247,6 +259,8 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
             <td>{enrollment.groupIds.map(id => groupNames.get(id)).filter(Boolean).join(', ') || 'Bez grupe'}</td>
           </tr>)}</tbody>
         </table></div>}
+        {visibleEnrollments.length > 25 && <button type="button" className="secondary-button"
+          onClick={() => setShowAllStudents(value => !value)}>{showAllStudents ? 'Prikaži manje' : `Prikaži sve (${visibleEnrollments.length})`}</button>}
       </div>
     </div>;
   }
@@ -256,27 +270,21 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
       <div><p className="label">NASTAVA</p><h2>Predmeti po akademskim godinama</h2></div>
     </div>
     {error && <p role="alert" className="error">{error}</p>}
+    {coursesLoading ? <p role="status">Učitavanje predmeta…</p> : courses.length === 0 ? <p>Nema uvezenih predmeta. Otvorite Uvoz liste da dodate predmet.</p> :
+      <div className="course-picker"><label>Predmet<select value={courseToLoadId} onChange={event => {
+        setCourseToLoadId(event.target.value); setSelectedCourseId(''); setError('');
+      }}><option value="">Izaberite predmet</option>
+        {courses.map(course => <option key={course.id} value={course.id}>{course.code} — {course.name}</option>)}
+      </select></label>
+      <button type="button" disabled={!courseToLoadId || courseToLoadId === selectedCourseId}
+        onClick={() => setSelectedCourseId(courseToLoadId)}>Učitaj predmet</button></div>}
     <div className="course-layout">
       <div>
-        <h3>Predmeti</h3>
-        {courses.length === 0 ? <p>Nema uvezenih predmeta.</p> : <div className="item-list">
-          {courses.map(course => <button
-            className={course.id === selectedCourseId ? 'item active' : 'item'}
-            type="button"
-            key={course.id}
-            onClick={() => { setError(''); setSelectedCourseId(course.id); }}
-          ><strong>{course.code}</strong><span>{course.name}</span></button>)}
-        </div>}
-      </div>
-      <div>
-        {!selectedCourse ? <p>Izaberite predmet za pregled.</p> : <>
+        {!selectedCourse ? <p>Izaberite predmet i kliknite „Učitaj predmet” za pregled.</p> : <>
           <div className="course-title"><div><h3>{selectedCourse.name}</h3><p>{selectedCourse.code}</p></div>
-            <button className="danger-button" type="button" disabled={deleting} onClick={() => void deleteCourse()}>Obriši predmet</button>
           </div>
-          {employees.length > 0 && <div className="course-employees">
-            <strong>Zaposleni na predmetu</strong>
-            <span>{employees.map(employee => employee.email).join(', ')}</span>
-          </div>}
+          {employees.length > 0 && <details className="course-employees"><summary>Zaposleni na predmetu</summary>
+            <p>{employees.map(employee => employee.email).join(', ')}</p></details>}
           {Object.keys(offeringsByYear).length === 0 ? <p>Predmet nema uvezenih izvođenja.</p> : Object.entries(offeringsByYear)
             .sort(([a], [b]) => b.localeCompare(a))
             .map(([year, items]) => <section key={year} className="academic-year">
@@ -289,6 +297,7 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0, importedC
               ><strong>{offering.studyProgram}</strong><span>{offering.studyType}, {offering.yearOfStudy}. godina, {offering.semester}. semestar</span></button>)}</div>
               {items.some(offering => offering.id === selectedOfferingId) && offeringDetails()}
             </section>)}
+          <button className="danger-button" type="button" disabled={deleting} onClick={() => void deleteCourse()}>Obriši predmet</button>
         </>}
       </div>
     </div>
