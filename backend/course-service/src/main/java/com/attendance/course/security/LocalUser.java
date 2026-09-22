@@ -21,22 +21,31 @@ public class LocalUser {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @Column(name = "display_name", nullable = false, length = 200)
+    private String displayName;
+
     @Column(nullable = false, length = 30)
     private String role;
 
     protected LocalUser() {}
 
     public LocalUser(String username, String passwordHash, String email, String role) {
+        this(username, passwordHash, email, role, username);
+    }
+
+    public LocalUser(String username, String passwordHash, String email, String role, String displayName) {
         this.id = UUID.randomUUID();
         this.username = username;
         this.passwordHash = passwordHash;
         this.email = email;
         this.role = role;
+        this.displayName = displayName;
     }
 
     public UUID getId() { return id; }
     public String getUsername() { return username; }
     public String getPasswordHash() { return passwordHash; }
     public String getEmail() { return email; }
+    public String getDisplayName() { return displayName; }
     public String getRole() { return role; }
 }

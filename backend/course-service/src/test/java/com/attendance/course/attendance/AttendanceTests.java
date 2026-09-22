@@ -4,6 +4,7 @@ import com.attendance.course.*;
 import com.attendance.course.sessions.*;
 import com.attendance.course.security.LocalUser;
 import com.attendance.course.security.LocalUserRepository;
+import com.attendance.course.reports.AttendanceReportDataService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
@@ -25,6 +26,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
@@ -60,6 +63,7 @@ class AttendanceTests {
     @Autowired private CourseEmployeeRepository courseEmployees;
     @Autowired private LocalUserRepository localUsers;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private AttendanceReportDataService reportData;
     @MockitoBean private Clock qrClock;
 
     private final Instant start = Instant.parse("2026-10-01T09:00:00Z");
@@ -83,7 +87,7 @@ class AttendanceTests {
         localUsers.deleteAll();
         course = courses.saveAndFlush(new Course("ATT-1", "Evidencija prisustva"));
         employee = localUsers.saveAndFlush(new LocalUser("attendance-professor", "hash",
-                "attendance.professor@etf.unibl.org", "EMPLOYEE"));
+                "attendance.professor@etf.unibl.org", "EMPLOYEE", "Profesor Evidencije"));
         courseEmployees.saveAndFlush(new CourseEmployee(course, employee, CourseEmployeeRole.TEACHER));
         offering = offerings.saveAndFlush(new CourseOffering(course,
                 new CreateOfferingRequest("2026/2027", "Računarstvo", "OSNOVNE", (short) 1, (short) 1)));
@@ -391,6 +395,47 @@ class AttendanceTests {
                 .andExpect(status().isForbidden());
         mvc.perform(post("/api/student/attendance").contentType("application/json").content(body))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void reportDataContainsSessionMetadataStaffAndOnlyPresentStudents() {
+        LocalUser assistant = localUsers.saveAndFlush(new LocalUser("attendance-assistant", "hash",
+                "attendance.assistant@etf.unibl.org", "EMPLOYEE", "Asistent Nastave"));
+        courseEmployees.saveAndFlush(new CourseEmployee(course, assistant, CourseEmployeeRole.ASSISTANT));
+        TeachingSession session = activeSession(lecture);
+        attendances.saveAndFlush(new Attendance(session, student, start,
+                "203.0.113.25", "Test Browser", UUID.randomUUID()));
+        students.saveAndFlush(new Student("101/26", "Dejan", "Zeljković",
+                "dejan.zeljkovic@student.etf.unibl.org"));
+
+        var report = reportData.session(session.getId(), employee.getId());
+
+        assertThat(report.offering().courseCode()).isEqualTo("ATT-1");
+        assertThat(report.offering().academicYear()).isEqualTo("2026/2027");
+        assertThat(report.offering().studyProgram()).isEqualTo("Računarstvo");
+        assertThat(report.offering().semester()).isEqualTo((short) 1);
+        assertThat(report.date()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(report.status()).isEqualTo(SessionStatus.ACTIVE);
+        assertThat(report.activityType()).isEqualTo(ActivityType.LECTURE);
+        assertThat(report.groupNumber()).isEqualTo("ALL");
+        assertThat(report.offering().employees()).extracting("displayName")
+                .containsExactly("Asistent Nastave", "Profesor Evidencije");
+        assertThat(report.presentStudents()).extracting("indexNumber").containsExactly("100/26");
+        assertThat(report.presentStudents().getFirst().email())
+                .isEqualTo("marija.stojanovic@student.etf.unibl.org");
+    }
+
+    @Test
+    void reportDataRejectsEmployeeNotAssignedToCourse() {
+        TeachingSession session = activeSession(lecture);
+        LocalUser other = localUsers.saveAndFlush(new LocalUser("other", "hash", "other@etf.unibl.org", "EMPLOYEE"));
+
+        assertThatThrownBy(() -> reportData.session(session.getId(), other.getId()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> reportData.offering(offering.getId(), other.getId()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
     }
 
     private TeachingSession activeSession(TeachingGroup group) {
