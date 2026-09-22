@@ -18,9 +18,11 @@ public class SessionExportController {
     private static final MediaType XLSX = MediaType.parseMediaType(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     private final SessionExcelExportService excel;
+    private final SessionPdfExportService pdf;
 
-    public SessionExportController(SessionExcelExportService excel) {
+    public SessionExportController(SessionExcelExportService excel, SessionPdfExportService pdf) {
         this.excel = excel;
+        this.pdf = pdf;
     }
 
     @GetMapping("/{sessionId}/report.xlsx")
@@ -29,6 +31,15 @@ public class SessionExportController {
         return ResponseEntity.ok().contentType(XLSX)
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename("prisustvo-sesija-" + sessionId + ".xlsx").build().toString())
+                .body(content);
+    }
+
+    @GetMapping("/{sessionId}/report.pdf")
+    public ResponseEntity<byte[]> pdf(@PathVariable UUID sessionId, @AuthenticationPrincipal Jwt jwt) {
+        byte[] content = pdf.export(sessionId, UUID.fromString(jwt.getSubject()));
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename("prisustvo-sesija-" + sessionId + ".pdf").build().toString())
                 .body(content);
     }
 }
