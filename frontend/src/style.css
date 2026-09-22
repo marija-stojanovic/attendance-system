@@ -25,6 +25,9 @@ select { padding: 11px; border: 1px solid #9badbd; border-radius: 6px; font: inh
 .attendance-panel form { margin-top: 8px; }
 .qr-camera { display: block; width: 100%; max-width: 520px; max-height: 390px; margin: 8px auto; border-radius: 8px; background: #101820; }
 .attendance-list { margin-top: 20px; }
+.report-downloads { margin-top: 18px; padding: 14px; background: #f8fbfd; border: 1px solid #c7d5e0; border-radius: 7px; }
+.download-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.download-actions button { margin: 0; }
 .management-panel { margin-top: 24px; }
 .import-panel { margin-top: 24px; }
 .import-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 18px 0; }

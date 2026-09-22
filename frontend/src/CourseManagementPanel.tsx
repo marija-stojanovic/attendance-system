@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { downloadReport } from './downloadReport';
 
 type Props = { apiUrl: string; token: string; refreshKey?: number };
 type Course = { id: string; code: string; name: string };
@@ -45,6 +46,7 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0 }: Props) 
   const [settingsForms, setSettingsForms] = useState<Record<string, SettingsForm>>({});
   const [savingSettings, setSavingSettings] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [downloading, setDownloading] = useState('');
   const [localRefresh, setLocalRefresh] = useState(0);
   const [offeringRefresh, setOfferingRefresh] = useState(0);
   const [error, setError] = useState('');
@@ -189,6 +191,18 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0 }: Props) 
     finally { setDeleting(false); }
   }
 
+  async function downloadSummary(format: 'xlsx' | 'pdf') {
+    if (!selectedOfferingId || downloading) return;
+    setDownloading(format);
+    setError('');
+    try {
+      await downloadReport(apiUrl, token,
+        `/api/offerings/${selectedOfferingId}/attendance-summary.${format}`,
+        `zbirno-prisustvo-${selectedOfferingId}.${format}`);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Preuzimanje nije uspjelo.'); }
+    finally { setDownloading(''); }
+  }
+
   function offeringDetails() {
     if (!selectedOffering) return null;
 
@@ -198,6 +212,17 @@ export function CourseManagementPanel({ apiUrl, token, refreshKey = 0 }: Props) 
         <div><strong>Tip studija</strong><span>{selectedOffering.studyType}</span></div>
         <div><strong>Godina studija</strong><span>{selectedOffering.yearOfStudy}.</span></div>
         <div><strong>Semestar</strong><span>{selectedOffering.semester}.</span></div>
+      </div>
+
+      <div className="report-downloads">
+        <strong>Zbirna evidencija prisustva</strong>
+        <div className="download-actions">
+          <button type="button" disabled={Boolean(downloading)} onClick={() => void downloadSummary('xlsx')}>
+            {downloading === 'xlsx' ? 'Preuzimanje…' : 'Preuzmi Excel'}</button>
+          <button type="button" className="secondary-button" disabled={Boolean(downloading)}
+            onClick={() => void downloadSummary('pdf')}>
+            {downloading === 'pdf' ? 'Preuzimanje…' : 'Preuzmi PDF'}</button>
+        </div>
       </div>
 
       <div className="activity-groups">
