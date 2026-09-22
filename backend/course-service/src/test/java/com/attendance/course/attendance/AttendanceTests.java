@@ -5,6 +5,7 @@ import com.attendance.course.sessions.*;
 import com.attendance.course.security.LocalUser;
 import com.attendance.course.security.LocalUserRepository;
 import com.attendance.course.reports.AttendanceReportDataService;
+import com.attendance.course.reports.AttendanceSummaryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.time.Clock;
@@ -66,6 +67,7 @@ class AttendanceTests {
     @Autowired private LocalUserRepository localUsers;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private AttendanceReportDataService reportData;
+    @Autowired private AttendanceSummaryService attendanceSummary;
     @MockitoBean private Clock qrClock;
 
     private final Instant start = Instant.parse("2026-10-01T09:00:00Z");
@@ -477,6 +479,72 @@ class AttendanceTests {
                         .with(employeeJwt(other)))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/sessions/{sessionId}/report.xlsx", session.getId())
+                        .with(studentJwt()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void summaryCountsClosedSessionsByStudentGroupAndIncludesZeroAttendance() throws Exception {
+        TeachingGroup first = groups.saveAndFlush(new TeachingGroup(offering, ActivityType.AUDITORY_EXERCISE, "G1"));
+        TeachingGroup second = groups.saveAndFlush(new TeachingGroup(offering, ActivityType.AUDITORY_EXERCISE, "G2"));
+        Student dejan = students.saveAndFlush(new Student("101/26", "Dejan", "Zeljković",
+                "dejan.zeljkovic@student.etf.unibl.org"));
+        Student anja = students.saveAndFlush(new Student("102/26", "Anja", "Vranješ",
+                "anja.vranjes@student.etf.unibl.org"));
+        enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of(first)));
+        enrollments.saveAndFlush(new Enrollment(dejan, offering, "REDOVAN", Set.of(second)));
+        enrollments.saveAndFlush(new Enrollment(anja, offering, "REDOVAN", Set.of()));
+
+        TeachingSession lectureSession = activeSession(lecture);
+        TeachingSession firstSession = activeSession(first);
+        TeachingSession secondSession = activeSession(second);
+        activeSession(lecture);
+        sessions.saveAndFlush(new TeachingSession(lecture, LocalDate.of(2026, 10, 2), LocalTime.of(10, 0)));
+        attendances.saveAndFlush(new Attendance(lectureSession, student, start,
+                "203.0.113.25", "Test Browser", UUID.randomUUID()));
+        attendances.saveAndFlush(new Attendance(firstSession, student, start,
+                "203.0.113.25", "Test Browser", UUID.randomUUID()));
+        attendances.saveAndFlush(new Attendance(secondSession, dejan, start,
+                "203.0.113.25", "Test Browser", UUID.randomUUID()));
+        sessionService.close(lectureSession.getId());
+        sessionService.close(firstSession.getId());
+        sessionService.close(secondSession.getId());
+
+        var summary = attendanceSummary.summary(offering.getId(), employee.getId());
+
+        assertThat(summary.closedSessions()).isEqualTo(3);
+        assertThat(summary.students()).extracting(item -> item.student().indexNumber())
+                .containsExactly("100/26", "101/26", "102/26");
+        assertThat(summary.students().get(0).arrivals()).isEqualTo(2);
+        assertThat(summary.students().get(0).absences()).isZero();
+        assertThat(summary.students().get(0).attendancePercent()).isEqualByComparingTo("100");
+        assertThat(summary.students().get(1).arrivals()).isOne();
+        assertThat(summary.students().get(1).absences()).isOne();
+        assertThat(summary.students().get(1).attendancePercent()).isEqualByComparingTo("50");
+        assertThat(summary.students().get(2).arrivals()).isZero();
+        assertThat(summary.students().get(2).expectedSessions()).isOne();
+        assertThat(summary.students().get(2).absences()).isOne();
+        assertThat(summary.students().get(2).attendancePercent()).isEqualByComparingTo("0");
+        mvc.perform(get("/api/offerings/{offeringId}/attendance-summary", offering.getId())
+                        .with(employeeJwt(employee)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.closedSessions").value(3))
+                .andExpect(jsonPath("$.students[2].student.indexNumber").value("102/26"));
+    }
+
+    @Test
+    void summaryRequiresAssignedEmployeeAndHandlesNoClosedSessions() throws Exception {
+        enrollments.saveAndFlush(new Enrollment(student, offering, "REDOVAN", Set.of()));
+        var summary = attendanceSummary.summary(offering.getId(), employee.getId());
+        assertThat(summary.students()).hasSize(1);
+        assertThat(summary.students().getFirst().expectedSessions()).isZero();
+        assertThat(summary.students().getFirst().attendancePercent()).isEqualByComparingTo("0");
+
+        LocalUser other = localUsers.saveAndFlush(new LocalUser("other", "hash", "other@etf.unibl.org", "EMPLOYEE"));
+        mvc.perform(get("/api/offerings/{offeringId}/attendance-summary", offering.getId())
+                        .with(employeeJwt(other)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/offerings/{offeringId}/attendance-summary", offering.getId())
                         .with(studentJwt()))
                 .andExpect(status().isForbidden());
     }
