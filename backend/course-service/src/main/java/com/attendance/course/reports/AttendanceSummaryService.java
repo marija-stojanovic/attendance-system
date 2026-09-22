@@ -70,6 +70,13 @@ public class AttendanceSummaryService {
                 .thenComparing(item -> item.student().firstName(), String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(item -> item.student().indexNumber()))
                 .toList();
-        return new ReportData.Summary(offering, closedSessions.size(), students);
+        var activityGroups = closedSessions.stream()
+                .map(session -> new ReportData.ActivityGroup(session.getActivityType(),
+                        session.getGroup().getGroupNumber()))
+                .distinct()
+                .sorted(Comparator.comparing(ReportData.ActivityGroup::activityType)
+                        .thenComparing(ReportData.ActivityGroup::groupNumber))
+                .toList();
+        return new ReportData.Summary(offering, closedSessions.size(), activityGroups, students);
     }
 }
