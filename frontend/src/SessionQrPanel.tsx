@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CreateSessionForm } from './CreateSessionForm';
+import { downloadReport } from './downloadReport';
 
 type Course = { id: string; code: string; name: string };
 type Session = { id: string; offeringId: string; groupId: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string };
@@ -93,6 +94,7 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
   const [sessionId, setSessionId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [downloading, setDownloading] = useState('');
   const [reload, setReload] = useState(0);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -183,6 +185,16 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
     } catch (e) { setError(e instanceof Error ? e.message : 'Uklanjanje prisustva nije uspjelo.'); }
     finally { setDeletingAttendanceId(''); }
   }
+  async function downloadSession(format: 'xlsx' | 'pdf') {
+    if (!selected || downloading) return;
+    setDownloading(format);
+    setError('');
+    try {
+      await downloadReport(apiUrl, token, `/api/sessions/${selected.id}/report.${format}`,
+        `prisustvo-sesija-${selected.id}.${format}`);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Preuzimanje nije uspjelo.'); }
+    finally { setDownloading(''); }
+  }
   return <section className="session-panel">
     <h2>Sesije nastave</h2>
     {error && <p role="alert" className="error">{error}</p>}
@@ -226,6 +238,16 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
         Datum: {selected.date}<br />Vrijeme početka: {selected.startTime.slice(0, 5)}<br />
         Oblik aktivnosti: {activities[selected.activityType]}<br />Grupa: {selected.groupNumber}</p>
       <p>Stanje: {statuses[selected.status]}</p>
+      <div className="report-downloads">
+        <strong>Evidencija prisustva za ovu sesiju</strong>
+        <div className="download-actions">
+          <button type="button" disabled={Boolean(downloading)} onClick={() => void downloadSession('xlsx')}>
+            {downloading === 'xlsx' ? 'Preuzimanje…' : 'Preuzmi Excel'}</button>
+          <button type="button" className="secondary-button" disabled={Boolean(downloading)}
+            onClick={() => void downloadSession('pdf')}>
+            {downloading === 'pdf' ? 'Preuzimanje…' : 'Preuzmi PDF'}</button>
+        </div>
+      </div>
       {selected.status === 'CREATED' && <button disabled={busy} onClick={() => setEditing(true)}>Izmijeni sesiju</button>}
       {selected.status === 'CREATED' && <button disabled={busy} onClick={() => void changeState('activate')}>Aktiviraj sesiju</button>}
       {selected.status === 'ACTIVE' && <>
