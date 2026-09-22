@@ -460,11 +460,14 @@ class AttendanceTests {
                 .andReturn().getResponse().getContentAsByteArray();
 
         try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(file))) {
-            var sheet = workbook.getSheet("Prisustvo");
+            var sheet = workbook.getSheet("Присуство");
+            assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Евиденција присуства");
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("Предмет");
             assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("Evidencija prisustva");
-            assertThat(sheet.getRow(9).getCell(1).getStringCellValue()).isEqualTo("Predavanje");
+            assertThat(sheet.getRow(9).getCell(1).getStringCellValue()).isEqualTo("Предавање");
             assertThat(sheet.getRow(11).getCell(1).getStringCellValue()).isEqualTo("Profesor Evidencije");
             assertThat(sheet.getRow(13).getCell(1).getStringCellValue()).isEqualTo("2026-10-01");
+            assertThat(sheet.getRow(17).getCell(2).getStringCellValue()).isEqualTo("Број индекса");
             assertThat(sheet.getRow(18).getCell(0).getStringCellValue()).isEqualTo("Marija");
             assertThat(sheet.getRow(18).getCell(2).getStringCellValue()).isEqualTo("100/26");
             assertThat(sheet.getRow(18).getCell(3).getStringCellValue())
@@ -588,6 +591,28 @@ class AttendanceTests {
             assertThat(text.indexOf("100/26")).isLessThan(text.indexOf("101/26"));
             assertThat(text.indexOf("101/26")).isLessThan(text.indexOf("102/26"));
         }
+
+        byte[] excel = mvc.perform(get("/api/offerings/{offeringId}/attendance-summary.xlsx", offering.getId())
+                        .with(employeeJwt(employee)))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andExpect(header().string("Content-Disposition",
+                        "attachment; filename=\"zbirno-prisustvo-" + offering.getId() + ".xlsx\""))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+            var sheet = workbook.getSheet("Збирна евиденција");
+            assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Збирна евиденција присуства");
+            assertThat(sheet.getRow(15).getCell(4).getStringCellValue()).isEqualTo("Доласци");
+            assertThat(sheet.getRow(15).getCell(6).getStringCellValue()).isEqualTo("Присуство");
+            assertThat(sheet.getRow(16).getCell(2).getStringCellValue()).isEqualTo("100/26");
+            assertThat(sheet.getRow(16).getCell(4).getNumericCellValue()).isEqualTo(2);
+            assertThat(sheet.getRow(16).getCell(6).getNumericCellValue()).isEqualTo(1);
+            assertThat(sheet.getRow(17).getCell(2).getStringCellValue()).isEqualTo("101/26");
+            assertThat(sheet.getRow(17).getCell(6).getNumericCellValue()).isEqualTo(0.5);
+            assertThat(sheet.getRow(18).getCell(2).getStringCellValue()).isEqualTo("102/26");
+            assertThat(sheet.getRow(18).getCell(4).getNumericCellValue()).isZero();
+        }
     }
 
     @Test
@@ -609,6 +634,12 @@ class AttendanceTests {
                         .with(employeeJwt(other)))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/offerings/{offeringId}/attendance-summary.pdf", offering.getId())
+                        .with(studentJwt()))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/offerings/{offeringId}/attendance-summary.xlsx", offering.getId())
+                        .with(employeeJwt(other)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/offerings/{offeringId}/attendance-summary.xlsx", offering.getId())
                         .with(studentJwt()))
                 .andExpect(status().isForbidden());
     }

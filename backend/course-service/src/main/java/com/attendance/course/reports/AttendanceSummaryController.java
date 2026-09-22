@@ -15,12 +15,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/offerings")
 public class AttendanceSummaryController {
+    private static final MediaType XLSX = MediaType.parseMediaType(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     private final AttendanceSummaryService summaries;
     private final SummaryPdfExportService pdf;
+    private final SummaryExcelExportService excel;
 
-    public AttendanceSummaryController(AttendanceSummaryService summaries, SummaryPdfExportService pdf) {
+    public AttendanceSummaryController(AttendanceSummaryService summaries, SummaryPdfExportService pdf,
+            SummaryExcelExportService excel) {
         this.summaries = summaries;
         this.pdf = pdf;
+        this.excel = excel;
     }
 
     @GetMapping("/{offeringId}/attendance-summary")
@@ -34,6 +39,15 @@ public class AttendanceSummaryController {
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename("zbirno-prisustvo-" + offeringId + ".pdf").build().toString())
+                .body(content);
+    }
+
+    @GetMapping("/{offeringId}/attendance-summary.xlsx")
+    public ResponseEntity<byte[]> excel(@PathVariable UUID offeringId, @AuthenticationPrincipal Jwt jwt) {
+        byte[] content = excel.export(offeringId, UUID.fromString(jwt.getSubject()));
+        return ResponseEntity.ok().contentType(XLSX)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename("zbirno-prisustvo-" + offeringId + ".xlsx").build().toString())
                 .body(content);
     }
 }
