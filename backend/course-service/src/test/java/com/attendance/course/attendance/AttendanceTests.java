@@ -8,6 +8,8 @@ import com.attendance.course.reports.AttendanceReportDataService;
 import com.attendance.course.reports.AttendanceSummaryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.text.PDFTextStripper;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -479,6 +481,47 @@ class AttendanceTests {
                         .with(employeeJwt(other)))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/sessions/{sessionId}/report.xlsx", session.getId())
+                        .with(studentJwt()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void sessionPdfKeepsCyrillicNamesAndSplitsLongListAcrossPages() throws Exception {
+        TeachingSession session = activeSession(lecture);
+        attendances.save(new Attendance(session, student, start,
+                "203.0.113.25", "Test Browser", UUID.randomUUID()));
+        for (int number = 0; number < 90; number++) {
+            Student other = students.save(new Student("PDF-" + number + "/26",
+                    "Лука", "Ђурић", "luka." + number + "@student.etf.unibl.org"));
+            attendances.save(new Attendance(session, other, start,
+                    "203.0.113.25", "Test Browser", UUID.randomUUID()));
+        }
+        attendances.flush();
+
+        byte[] file = mvc.perform(get("/api/sessions/{sessionId}/report.pdf", session.getId())
+                        .with(employeeJwt(employee)))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Content-Disposition",
+                        "attachment; filename=\"prisustvo-sesija-" + session.getId() + ".pdf\""))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (var document = Loader.loadPDF(file)) {
+            assertThat(document.getNumberOfPages()).isGreaterThan(1);
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("Evidencija prisustva", "Ђурић", "Лука", "marija.stojanovic@student.etf.unibl.org");
+            assertThat(text).contains("Strana 1", "Strana 2", "PDF-89/26");
+        }
+    }
+
+    @Test
+    void sessionPdfIsUnavailableToUnassignedEmployeeAndStudent() throws Exception {
+        TeachingSession session = activeSession(lecture);
+        LocalUser other = localUsers.saveAndFlush(new LocalUser("other", "hash", "other@etf.unibl.org", "EMPLOYEE"));
+
+        mvc.perform(get("/api/sessions/{sessionId}/report.pdf", session.getId())
+                        .with(employeeJwt(other)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/sessions/{sessionId}/report.pdf", session.getId())
                         .with(studentJwt()))
                 .andExpect(status().isForbidden());
     }
