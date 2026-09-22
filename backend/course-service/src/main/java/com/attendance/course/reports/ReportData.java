@@ -5,6 +5,7 @@ import com.attendance.course.CourseEmployeeRole;
 import com.attendance.course.sessions.SessionStatus;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,5 +26,12 @@ public final class ReportData {
                           SessionStatus status, ActivityType activityType, String groupNumber,
                           List<Student> presentStudents) {
         public Session { presentStudents = List.copyOf(presentStudents); }
+    }
+
+    public record StudentSummary(Student student, int arrivals, int absences,
+                                 int expectedSessions, BigDecimal attendancePercent) {}
+
+    public record Summary(Offering offering, int closedSessions, List<StudentSummary> students) {
+        public Summary { students = List.copyOf(students); }
     }
 }

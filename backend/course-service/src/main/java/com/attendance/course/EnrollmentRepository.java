@@ -17,6 +17,9 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
 
     List<Enrollment> findByOfferingIdOrderByStudentLastNameAscStudentFirstNameAscStudentIndexNumberAsc(UUID offeringId);
 
+    @Query("select distinct e from Enrollment e join fetch e.student left join fetch e.groups where e.offering.id = :offeringId")
+    List<Enrollment> findForAttendanceSummary(@Param("offeringId") UUID offeringId);
+
     List<Enrollment> findByOfferingCourseIdOrderByStudentLastNameAscStudentFirstNameAscStudentIndexNumberAsc(UUID courseId);
 
     List<Enrollment> findByGroupsIdOrderByStudentLastNameAscStudentFirstNameAscStudentIndexNumberAsc(UUID groupId);
