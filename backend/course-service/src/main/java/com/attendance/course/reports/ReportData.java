@@ -31,7 +31,13 @@ public final class ReportData {
     public record StudentSummary(Student student, int arrivals, int absences,
                                  int expectedSessions, BigDecimal attendancePercent) {}
 
-    public record Summary(Offering offering, int closedSessions, List<StudentSummary> students) {
-        public Summary { students = List.copyOf(students); }
+    public record ActivityGroup(ActivityType activityType, String groupNumber) {}
+
+    public record Summary(Offering offering, int closedSessions, List<ActivityGroup> activityGroups,
+                          List<StudentSummary> students) {
+        public Summary {
+            activityGroups = List.copyOf(activityGroups);
+            students = List.copyOf(students);
+        }
     }
 }

@@ -573,6 +573,21 @@ class AttendanceTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.closedSessions").value(3))
                 .andExpect(jsonPath("$.students[2].student.indexNumber").value("102/26"));
+
+        byte[] pdf = mvc.perform(get("/api/offerings/{offeringId}/attendance-summary.pdf", offering.getId())
+                        .with(employeeJwt(employee)))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Content-Disposition",
+                        "attachment; filename=\"zbirno-prisustvo-" + offering.getId() + ".pdf\""))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (var document = Loader.loadPDF(pdf)) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("Zbirna evidencija prisustva", "Računarstvo", "Auditorne vježbe - G1",
+                    "Profesor Evidencije", "100.00%", "50.00%", "0.00%");
+            assertThat(text.indexOf("100/26")).isLessThan(text.indexOf("101/26"));
+            assertThat(text.indexOf("101/26")).isLessThan(text.indexOf("102/26"));
+        }
     }
 
     @Test
@@ -590,6 +605,32 @@ class AttendanceTests {
         mvc.perform(get("/api/offerings/{offeringId}/attendance-summary", offering.getId())
                         .with(studentJwt()))
                 .andExpect(status().isForbidden());
+        mvc.perform(get("/api/offerings/{offeringId}/attendance-summary.pdf", offering.getId())
+                        .with(employeeJwt(other)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/offerings/{offeringId}/attendance-summary.pdf", offering.getId())
+                        .with(studentJwt()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void summaryPdfSplitsStudentsWithoutAttendanceAcrossPages() throws Exception {
+        for (int number = 0; number < 75; number++) {
+            Student other = students.save(new Student("SUM-" + number + "/26", "Лука", "Ђурић",
+                    "luka." + number + "@student.etf.unibl.org"));
+            enrollments.save(new Enrollment(other, offering, "REDOVAN", Set.of()));
+        }
+        enrollments.flush();
+
+        byte[] pdf = mvc.perform(get("/api/offerings/{offeringId}/attendance-summary.pdf", offering.getId())
+                        .with(employeeJwt(employee)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        try (var document = Loader.loadPDF(pdf)) {
+            assertThat(document.getNumberOfPages()).isGreaterThan(1);
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("SUM-0/26", "SUM-74/26", "0.00%", "Strana 2", "Ђурић");
+        }
     }
 
     private TeachingSession activeSession(TeachingGroup group) {
