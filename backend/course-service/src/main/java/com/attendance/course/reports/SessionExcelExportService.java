@@ -24,37 +24,37 @@ public class SessionExcelExportService {
     public byte[] export(UUID sessionId, UUID employeeId) {
         ReportData.Session report = reports.session(sessionId, employeeId);
         try (var workbook = new XSSFWorkbook(); var output = new ByteArrayOutputStream()) {
-            var sheet = workbook.createSheet("Prisustvo");
+            var sheet = workbook.createSheet("Присуство");
             Font boldFont = workbook.createFont();
             boldFont.setBold(true);
             CellStyle bold = workbook.createCellStyle();
             bold.setFont(boldFont);
 
             Row title = sheet.createRow(0);
-            title.createCell(0).setCellValue("Evidencija prisustva");
+            title.createCell(0).setCellValue("Евиденција присуства");
             title.getCell(0).setCellStyle(bold);
 
             var offering = report.offering();
             int row = 2;
-            row = detail(sheet, row, "Predmet", offering.courseName(), bold);
-            row = detail(sheet, row, "Šifra predmeta", offering.courseCode(), bold);
-            row = detail(sheet, row, "Akademska godina", offering.academicYear(), bold);
-            row = detail(sheet, row, "Studijski program", offering.studyProgram(), bold);
-            row = detail(sheet, row, "Tip studija", offering.studyType(), bold);
-            row = detail(sheet, row, "Godina studija", Short.toString(offering.yearOfStudy()), bold);
-            row = detail(sheet, row, "Semestar", Short.toString(offering.semester()), bold);
-            row = detail(sheet, row, "Oblik nastave", activityName(report.activityType()), bold);
-            row = detail(sheet, row, "Grupa", report.activityType() == ActivityType.LECTURE
-                    ? "Sve grupe" : report.groupNumber(), bold);
-            row = detail(sheet, row, "Nastavnik", employees(offering, CourseEmployeeRole.TEACHER), bold);
-            row = detail(sheet, row, "Asistent", employees(offering, CourseEmployeeRole.ASSISTANT), bold);
-            row = detail(sheet, row, "Datum sesije", report.date().toString(), bold);
-            row = detail(sheet, row, "Vrijeme", report.startTime().toString(), bold);
-            row = detail(sheet, row, "Broj prisutnih", Integer.toString(report.presentStudents().size()), bold);
+            row = detail(sheet, row, "Предмет", offering.courseName(), bold);
+            row = detail(sheet, row, "Шифра предмета", offering.courseCode(), bold);
+            row = detail(sheet, row, "Академска година", offering.academicYear(), bold);
+            row = detail(sheet, row, "Студијски програм", offering.studyProgram(), bold);
+            row = detail(sheet, row, "Тип студија", offering.studyType(), bold);
+            row = detail(sheet, row, "Година студија", Short.toString(offering.yearOfStudy()), bold);
+            row = detail(sheet, row, "Семестар", Short.toString(offering.semester()), bold);
+            row = detail(sheet, row, "Облик наставе", activityName(report.activityType()), bold);
+            row = detail(sheet, row, "Група", report.activityType() == ActivityType.LECTURE
+                    ? "Све групе" : report.groupNumber(), bold);
+            row = detail(sheet, row, "Наставник", employees(offering, CourseEmployeeRole.TEACHER), bold);
+            row = detail(sheet, row, "Асистент", employees(offering, CourseEmployeeRole.ASSISTANT), bold);
+            row = detail(sheet, row, "Датум сесије", report.date().toString(), bold);
+            row = detail(sheet, row, "Вријеме", report.startTime().toString(), bold);
+            row = detail(sheet, row, "Број присутних", Integer.toString(report.presentStudents().size()), bold);
 
             int headerRow = row + 1;
             Row header = sheet.createRow(headerRow);
-            String[] columns = {"Ime", "Prezime", "Broj indeksa", "E-mail"};
+            String[] columns = {"Име", "Презиме", "Број индекса", "Е-пошта"};
             for (int column = 0; column < columns.length; column++) {
                 header.createCell(column).setCellValue(columns[column]);
                 header.getCell(column).setCellStyle(bold);
@@ -94,9 +94,9 @@ public class SessionExcelExportService {
 
     private String activityName(ActivityType type) {
         return switch (type) {
-            case LECTURE -> "Predavanje";
-            case AUDITORY_EXERCISE -> "Auditorne vježbe";
-            case LABORATORY_EXERCISE -> "Laboratorijske vježbe";
+            case LECTURE -> "Предавање";
+            case AUDITORY_EXERCISE -> "Аудиторне вјежбе";
+            case LABORATORY_EXERCISE -> "Лабораторијске вјежбе";
         };
     }
 }
