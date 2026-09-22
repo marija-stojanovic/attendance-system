@@ -6,6 +6,7 @@ import com.attendance.course.security.LocalUser;
 import com.attendance.course.security.LocalUserRepository;
 import com.attendance.course.reports.AttendanceReportDataService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayInputStream;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -21,6 +22,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -436,6 +438,47 @@ class AttendanceTests {
         assertThatThrownBy(() -> reportData.offering(offering.getId(), other.getId()))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    void employeeDownloadsSessionExcelWithPresentStudents() throws Exception {
+        TeachingSession session = activeSession(lecture);
+        attendances.saveAndFlush(new Attendance(session, student, start,
+                "203.0.113.25", "Test Browser", UUID.randomUUID()));
+
+        byte[] file = mvc.perform(get("/api/sessions/{sessionId}/report.xlsx", session.getId())
+                        .with(employeeJwt(employee)))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andExpect(header().string("Content-Disposition",
+                        "attachment; filename=\"prisustvo-sesija-" + session.getId() + ".xlsx\""))
+                .andReturn().getResponse().getContentAsByteArray();
+
+        try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(file))) {
+            var sheet = workbook.getSheet("Prisustvo");
+            assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("Evidencija prisustva");
+            assertThat(sheet.getRow(9).getCell(1).getStringCellValue()).isEqualTo("Predavanje");
+            assertThat(sheet.getRow(11).getCell(1).getStringCellValue()).isEqualTo("Profesor Evidencije");
+            assertThat(sheet.getRow(13).getCell(1).getStringCellValue()).isEqualTo("2026-10-01");
+            assertThat(sheet.getRow(18).getCell(0).getStringCellValue()).isEqualTo("Marija");
+            assertThat(sheet.getRow(18).getCell(2).getStringCellValue()).isEqualTo("100/26");
+            assertThat(sheet.getRow(18).getCell(3).getStringCellValue())
+                    .isEqualTo("marija.stojanovic@student.etf.unibl.org");
+        }
+    }
+
+    @Test
+    void sessionExcelIsUnavailableToUnassignedEmployeeAndStudent() throws Exception {
+        TeachingSession session = activeSession(lecture);
+        LocalUser other = localUsers.saveAndFlush(new LocalUser("other", "hash", "other@etf.unibl.org", "EMPLOYEE"));
+
+        mvc.perform(get("/api/sessions/{sessionId}/report.xlsx", session.getId())
+                        .with(employeeJwt(other)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/sessions/{sessionId}/report.xlsx", session.getId())
+                        .with(studentJwt()))
+                .andExpect(status().isForbidden());
     }
 
     private TeachingSession activeSession(TeachingGroup group) {
