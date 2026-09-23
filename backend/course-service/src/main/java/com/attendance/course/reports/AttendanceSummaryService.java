@@ -12,9 +12,11 @@ import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -104,8 +106,33 @@ public class AttendanceSummaryService {
                     session.getActivityType(), session.getGroup().getGroupNumber(), expectedStudents,
                     presentStudentIds.size(), percentage(presentStudentIds.size(), expectedStudents));
         }).toList();
+        var trendByDate = new TreeMap<java.time.LocalDate, Totals>();
+        for (var session : sessionSummaries) {
+            trendByDate.computeIfAbsent(session.date(), ignored -> new Totals())
+                    .add(session.expectedStudents(), session.presentStudents());
+        }
+        var attendanceTrend = trendByDate.entrySet().stream()
+                .map(entry -> new ReportData.TrendPoint(entry.getKey(), entry.getValue().sessions,
+                        entry.getValue().expected, entry.getValue().recorded,
+                        percentage(entry.getValue().recorded, entry.getValue().expected)))
+                .toList();
+        Map<ReportData.ActivityGroup, Totals> totalsByGroup = new LinkedHashMap<>();
+        for (var session : sessionSummaries) {
+            if (session.activityType() == ActivityType.LECTURE) continue;
+            var group = new ReportData.ActivityGroup(session.activityType(), session.groupNumber());
+            totalsByGroup.computeIfAbsent(group, ignored -> new Totals())
+                    .add(session.expectedStudents(), session.presentStudents());
+        }
+        var groupComparisons = totalsByGroup.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(Comparator.comparing(ReportData.ActivityGroup::activityType)
+                        .thenComparing(ReportData.ActivityGroup::groupNumber)))
+                .map(entry -> new ReportData.GroupComparison(entry.getKey().activityType(),
+                        entry.getKey().groupNumber(), entry.getValue().sessions, entry.getValue().students,
+                        entry.getValue().expected, entry.getValue().recorded,
+                        percentage(entry.getValue().recorded, entry.getValue().expected)))
+                .toList();
         return new ReportData.Summary(offering, closedSessions.size(), activityGroups, lowAttendanceThreshold,
-                lowAttendanceStudents, sessionSummaries, students);
+                lowAttendanceStudents, sessionSummaries, attendanceTrend, groupComparisons, students);
     }
 
     private boolean applies(Enrollment enrollment, TeachingSession session, Set<UUID> attendedSessionIds) {
@@ -118,5 +145,19 @@ public class AttendanceSummaryService {
         if (total == 0) return BigDecimal.ZERO.setScale(2);
         return BigDecimal.valueOf(value).multiply(BigDecimal.valueOf(100))
                 .divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
+    }
+
+    private static final class Totals {
+        private int sessions;
+        private int students;
+        private int expected;
+        private int recorded;
+
+        private void add(int expected, int recorded) {
+            sessions++;
+            students = Math.max(students, expected);
+            this.expected += expected;
+            this.recorded += recorded;
+        }
     }
 }
