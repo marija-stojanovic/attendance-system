@@ -113,5 +113,20 @@ button.group-chip:hover, button.group-chip.active { color: white; background: #2
 .analytics-section h3 { margin-bottom: 10px; }
 .analytics-section td strong { font-variant-numeric: tabular-nums; }
 .low-attendance { color: #a22222; }
+.chart-container { margin: 12px 0 18px; padding: 14px; overflow-x: auto; background: white; border: 1px solid #c7d5e0; border-radius: 8px; }
+.trend-chart { display: block; width: 100%; min-width: 560px; height: auto; }
+.chart-grid { stroke: #d8e2ea; stroke-width: 1; }
+.chart-line { fill: none; stroke: #215b94; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.chart-point { fill: white; stroke: #215b94; stroke-width: 4; }
+.chart-label { fill: #53697d; font-size: 12px; }
+.chart-value { fill: #173f66; font-size: 13px; font-weight: 700; }
+.group-chart { display: grid; gap: 12px; margin: 12px 0 18px; padding: 16px; background: white; border: 1px solid #c7d5e0; border-radius: 8px; }
+.group-chart-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(180px, 3fr) 75px; align-items: center; gap: 12px; }
+.group-chart-label { display: grid; gap: 2px; }
+.group-chart-label span { color: #53697d; font-size: 13px; }
+.group-chart-track { height: 18px; overflow: hidden; background: #dfe8ef; border-radius: 10px; }
+.group-chart-track span { display: block; min-width: 2px; height: 100%; background: #2876b5; border-radius: 10px; }
+.group-chart-value { text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 700px) { main { margin: 24px 16px; padding: 24px; } }
 @media (max-width: 760px) { .student-filters, .analytics-filters { grid-template-columns: 1fr; } .panel-heading { align-items: flex-start; } .course-picker { display: grid; } .course-picker button { width: 100%; } }
+@media (max-width: 620px) { .group-chart-row { grid-template-columns: 1fr 65px; } .group-chart-track { grid-column: 1 / -1; grid-row: 2; } }

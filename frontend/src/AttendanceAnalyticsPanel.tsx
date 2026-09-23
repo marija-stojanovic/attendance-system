@@ -34,11 +34,29 @@ type SessionSummary = {
   presentStudents: number;
   attendancePercent: number;
 };
+type TrendPoint = {
+  date: string;
+  closedSessions: number;
+  expectedAttendances: number;
+  recordedAttendances: number;
+  attendancePercent: number;
+};
+type GroupComparison = {
+  activityType: string;
+  groupNumber: string;
+  closedSessions: number;
+  students: number;
+  expectedAttendances: number;
+  recordedAttendances: number;
+  attendancePercent: number;
+};
 type AnalyticsSummary = {
   closedSessions: number;
   lowAttendanceThresholdPercent: number;
   lowAttendanceStudents: StudentSummary[];
   sessions: SessionSummary[];
+  attendanceTrend: TrendPoint[];
+  groupComparisons: GroupComparison[];
   students: StudentSummary[];
 };
 
@@ -47,6 +65,52 @@ const activityNames: Record<string, string> = {
   AUDITORY_EXERCISE: 'Auditorne vježbe',
   LABORATORY_EXERCISE: 'Laboratorijske vježbe'
 };
+
+function TrendChart({ points }: { points: TrendPoint[] }) {
+  const width = 760;
+  const height = 260;
+  const left = 50;
+  const right = 20;
+  const top = 20;
+  const bottom = 48;
+  const graphWidth = width - left - right;
+  const graphHeight = height - top - bottom;
+  const x = (index: number) => points.length === 1 ? left + graphWidth / 2
+    : left + index * graphWidth / (points.length - 1);
+  const y = (percentage: number) => top + graphHeight - percentage * graphHeight / 100;
+  const line = points.map((point, index) => `${x(index)},${y(point.attendancePercent)}`).join(' ');
+
+  return <div className="chart-container">
+    <svg className="trend-chart" viewBox={`0 0 ${width} ${height}`} role="img"
+      aria-label="Linijski prikaz procenta prisustva po datumima">
+      {[0, 25, 50, 75, 100].map(value => <g key={value}>
+        <line x1={left} y1={y(value)} x2={width - right} y2={y(value)} className="chart-grid" />
+        <text x={left - 10} y={y(value) + 4} textAnchor="end" className="chart-label">{value}%</text>
+      </g>)}
+      {points.length > 1 && <polyline points={line} className="chart-line" />}
+      {points.map((point, index) => <g key={point.date}>
+        <circle cx={x(index)} cy={y(point.attendancePercent)} r="6" className="chart-point" />
+        <text x={x(index)} y={y(point.attendancePercent) - 12} textAnchor="middle" className="chart-value">
+          {point.attendancePercent.toFixed(1)}%
+        </text>
+        <text x={x(index)} y={height - 18} textAnchor="middle" className="chart-label">
+          {new Date(point.date + 'T00:00:00').toLocaleDateString('bs-BA', { day: '2-digit', month: '2-digit' })}
+        </text>
+      </g>)}
+    </svg>
+  </div>;
+}
+
+function GroupChart({ groups }: { groups: GroupComparison[] }) {
+  return <div className="group-chart" role="img" aria-label="Poređenje procenta prisustva između grupa">
+    {groups.map(group => <div className="group-chart-row" key={`${group.activityType}-${group.groupNumber}`}>
+      <div className="group-chart-label"><strong>{group.groupNumber}</strong>
+        <span>{activityNames[group.activityType] || group.activityType}</span></div>
+      <div className="group-chart-track"><span style={{ width: `${group.attendancePercent}%` }} /></div>
+      <strong className="group-chart-value">{group.attendancePercent.toFixed(2)}%</strong>
+    </div>)}
+  </div>;
+}
 
 export function AttendanceAnalyticsPanel({ apiUrl, token }: Props) {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -159,6 +223,32 @@ export function AttendanceAnalyticsPanel({ apiUrl, token }: Props) {
         <div><span>Prosječno prisustvo</span><strong>{averageAttendance.toFixed(2)}%</strong></div>
         <div><span>Ispod praga od {summary.lowAttendanceThresholdPercent.toFixed(0)}%</span>
           <strong>{summary.lowAttendanceStudents.length}</strong></div>
+      </div>
+      <div className="analytics-section">
+        <h3>Trend prisustva tokom semestra</h3>
+        {summary.attendanceTrend.length === 0 ? <p>Nema zatvorenih sesija za prikaz trenda.</p>
+          : <><TrendChart points={summary.attendanceTrend} />
+            <div className="table-scroll"><table>
+              <thead><tr><th>Datum</th><th>Sesije</th><th>Evidentirani dolasci</th><th>Očekivani dolasci</th><th>Prisustvo</th></tr></thead>
+              <tbody>{summary.attendanceTrend.map(point => <tr key={point.date}>
+                <td>{new Date(point.date + 'T00:00:00').toLocaleDateString('bs-BA')}</td>
+                <td>{point.closedSessions}</td><td>{point.recordedAttendances}</td>
+                <td>{point.expectedAttendances}</td><td><strong>{point.attendancePercent.toFixed(2)}%</strong></td>
+              </tr>)}</tbody>
+            </table></div></>}
+      </div>
+      <div className="analytics-section">
+        <h3>Poređenje grupa</h3>
+        {summary.groupComparisons.length === 0 ? <p>Nema zatvorenih grupnih sesija za poređenje.</p>
+          : <><GroupChart groups={summary.groupComparisons} />
+            <div className="table-scroll"><table>
+              <thead><tr><th>Aktivnost</th><th>Grupa</th><th>Studenti</th><th>Sesije</th><th>Dolasci</th><th>Očekivano</th><th>Prisustvo</th></tr></thead>
+              <tbody>{summary.groupComparisons.map(group => <tr key={`${group.activityType}-${group.groupNumber}`}>
+                <td>{activityNames[group.activityType] || group.activityType}</td><td>{group.groupNumber}</td>
+                <td>{group.students}</td><td>{group.closedSessions}</td><td>{group.recordedAttendances}</td>
+                <td>{group.expectedAttendances}</td><td><strong>{group.attendancePercent.toFixed(2)}%</strong></td>
+              </tr>)}</tbody>
+            </table></div></>}
       </div>
       <div className="analytics-section">
         <h3>Studenti ispod praga</h3>
