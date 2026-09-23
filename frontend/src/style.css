@@ -102,5 +102,16 @@ button.group-chip:hover, button.group-chip.active { color: white; background: #2
 .available-group-buttons button { width: auto; min-width: 125px; display: grid; gap: 3px; margin: 0; padding: 9px 12px; background: #e8f0f7; color: #17324d; border: 1px solid #9db5ca; }
 .available-group-buttons button.selected-group { background: #23649d; color: white; border-color: #23649d; }
 .available-group-buttons button:disabled { opacity: .55; cursor: not-allowed; }
+.analytics-panel { margin-top: 24px; }
+.analytics-panel .panel-heading p { margin: 4px 0 0; color: #53697d; }
+.analytics-filters { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(300px, 2fr); gap: 14px; margin: 18px 0; }
+.analytics-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 18px 0; }
+.analytics-cards div { display: grid; gap: 6px; padding: 16px; background: white; border: 1px solid #c7d5e0; border-radius: 8px; }
+.analytics-cards span { color: #53697d; font-size: 14px; }
+.analytics-cards strong { color: #173f66; font-size: 26px; font-variant-numeric: tabular-nums; }
+.analytics-section { margin-top: 20px; padding-top: 4px; }
+.analytics-section h3 { margin-bottom: 10px; }
+.analytics-section td strong { font-variant-numeric: tabular-nums; }
+.low-attendance { color: #a22222; }
 @media (max-width: 700px) { main { margin: 24px 16px; padding: 24px; } }
-@media (max-width: 760px) { .student-filters { grid-template-columns: 1fr; } .panel-heading { align-items: flex-start; } .course-picker { display: grid; } .course-picker button { width: 100%; } }
+@media (max-width: 760px) { .student-filters, .analytics-filters { grid-template-columns: 1fr; } .panel-heading { align-items: flex-start; } .course-picker { display: grid; } .course-picker button { width: 100%; } }

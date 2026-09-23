@@ -7,6 +7,7 @@ import { CourseManagementPanel } from './CourseManagementPanel';
 import { CourseImportPanel } from './CourseImportPanel';
 import { StudentCoursesPanel } from './StudentCoursesPanel';
 import { StudentAttendancePanel } from './StudentAttendancePanel';
+import { AttendanceAnalyticsPanel } from './AttendanceAnalyticsPanel';
 
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -27,7 +28,7 @@ function App() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [courseRefresh, setCourseRefresh] = useState(0);
-  const [employeeView, setEmployeeView] = useState<'courses' | 'import' | 'sessions'>('courses');
+  const [employeeView, setEmployeeView] = useState<'courses' | 'import' | 'sessions' | 'analytics'>('courses');
   const [importMessage, setImportMessage] = useState('');
   const [importPreviewOpen, setImportPreviewOpen] = useState(false);
 
@@ -122,7 +123,7 @@ function App() {
     setImportPreviewOpen(false);
   }
 
-  function openEmployeeView(view: 'courses' | 'import' | 'sessions') {
+  function openEmployeeView(view: 'courses' | 'import' | 'sessions' | 'analytics') {
     if (employeeView === 'import' && view !== 'import' && importPreviewOpen
         && !window.confirm('Učitani fajl nije sačuvan. Napustiti uvoz?')) return;
     if (view !== 'import') setImportPreviewOpen(false);
@@ -152,6 +153,9 @@ function App() {
           <button type="button" className={employeeView === 'sessions' ? 'active' : ''}
             aria-current={employeeView === 'sessions' ? 'page' : undefined}
             onClick={() => openEmployeeView('sessions')}>Sesije</button>
+          <button type="button" className={employeeView === 'analytics' ? 'active' : ''}
+            aria-current={employeeView === 'analytics' ? 'page' : undefined}
+            onClick={() => openEmployeeView('analytics')}>Analitika</button>
         </nav>
         {employeeView === 'courses' && <>
           {importMessage && <p className="success" role="status">{importMessage}</p>}
@@ -164,6 +168,7 @@ function App() {
           setEmployeeView('courses');
         }} />}
         {employeeView === 'sessions' && <SessionQrPanel apiUrl={apiUrl} token={token} />}
+        {employeeView === 'analytics' && <AttendanceAnalyticsPanel apiUrl={apiUrl} token={token} />}
       </>}
     </> : registration ? <section>
       <h2>Završetak registracije</h2>
