@@ -571,10 +571,27 @@ class AttendanceTests {
         assertThat(summary.students().get(2).expectedSessions()).isOne();
         assertThat(summary.students().get(2).absences()).isOne();
         assertThat(summary.students().get(2).attendancePercent()).isEqualByComparingTo("0");
+        assertThat(summary.lowAttendanceThresholdPercent()).isEqualByComparingTo("75");
+        assertThat(summary.lowAttendanceStudents()).extracting(item -> item.student().indexNumber())
+                .containsExactly("101/26", "102/26");
+        assertThat(summary.sessions()).hasSize(3);
+        var lectureSummary = summary.sessions().stream()
+                .filter(item -> item.id().equals(lectureSession.getId())).findFirst().orElseThrow();
+        assertThat(lectureSummary.expectedStudents()).isEqualTo(3);
+        assertThat(lectureSummary.presentStudents()).isOne();
+        assertThat(lectureSummary.attendancePercent()).isEqualByComparingTo("33.33");
+        var firstGroupSummary = summary.sessions().stream()
+                .filter(item -> item.id().equals(firstSession.getId())).findFirst().orElseThrow();
+        assertThat(firstGroupSummary.expectedStudents()).isOne();
+        assertThat(firstGroupSummary.presentStudents()).isOne();
+        assertThat(firstGroupSummary.attendancePercent()).isEqualByComparingTo("100");
         mvc.perform(get("/api/offerings/{offeringId}/attendance-summary", offering.getId())
                         .with(employeeJwt(employee)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.closedSessions").value(3))
+                .andExpect(jsonPath("$.lowAttendanceThresholdPercent").value(75))
+                .andExpect(jsonPath("$.lowAttendanceStudents[0].student.indexNumber").value("101/26"))
+                .andExpect(jsonPath("$.sessions.length()").value(3))
                 .andExpect(jsonPath("$.students[2].student.indexNumber").value("102/26"));
 
         byte[] pdf = mvc.perform(get("/api/offerings/{offeringId}/attendance-summary.pdf", offering.getId())
@@ -622,6 +639,9 @@ class AttendanceTests {
         assertThat(summary.students()).hasSize(1);
         assertThat(summary.students().getFirst().expectedSessions()).isZero();
         assertThat(summary.students().getFirst().attendancePercent()).isEqualByComparingTo("0");
+        assertThat(summary.lowAttendanceStudents()).isEmpty();
+        assertThat(summary.sessions()).isEmpty();
+        assertThat(summary.lowAttendanceThresholdPercent()).isEqualByComparingTo("75");
 
         LocalUser other = localUsers.saveAndFlush(new LocalUser("other", "hash", "other@etf.unibl.org", "EMPLOYEE"));
         mvc.perform(get("/api/offerings/{offeringId}/attendance-summary", offering.getId())
