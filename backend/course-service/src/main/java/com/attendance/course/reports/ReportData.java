@@ -33,10 +33,19 @@ public final class ReportData {
 
     public record ActivityGroup(ActivityType activityType, String groupNumber) {}
 
+    public record SessionSummary(UUID id, LocalDate date, LocalTime startTime, ActivityType activityType,
+                                 String groupNumber, int expectedStudents, int presentStudents,
+                                 BigDecimal attendancePercent) {}
+
     public record Summary(Offering offering, int closedSessions, List<ActivityGroup> activityGroups,
+                          BigDecimal lowAttendanceThresholdPercent,
+                          List<StudentSummary> lowAttendanceStudents,
+                          List<SessionSummary> sessions,
                           List<StudentSummary> students) {
         public Summary {
             activityGroups = List.copyOf(activityGroups);
+            lowAttendanceStudents = List.copyOf(lowAttendanceStudents);
+            sessions = List.copyOf(sessions);
             students = List.copyOf(students);
         }
     }

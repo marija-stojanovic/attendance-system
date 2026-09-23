@@ -30,6 +30,9 @@ teaching-session:
   max-active-seconds: ${SESSION_MAX_ACTIVE_SECONDS:14400}
   expiration-check-milliseconds: 60000
 
+attendance-analytics:
+  low-attendance-threshold-percent: ${ATTENDANCE_THRESHOLD_PERCENT:75}
+
 course-import:
   max-rows: 5000
   max-columns: 64
