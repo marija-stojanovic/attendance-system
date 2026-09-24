@@ -11,6 +11,7 @@ import com.attendance.course.CourseRepository;
 import com.attendance.course.CreateOfferingRequest;
 import com.attendance.course.Enrollment;
 import com.attendance.course.EnrollmentRepository;
+import com.attendance.course.EmployeeReference;
 import com.attendance.course.Student;
 import com.attendance.course.StudentRepository;
 import com.attendance.course.TeachingGroup;
@@ -61,7 +62,8 @@ class AnalyticsSourceControllerTests {
         LocalUser professor = users.saveAndFlush(new LocalUser("analytics-professor", "hash",
                 "analytics-professor@etf.org", "EMPLOYEE"));
         Course course = courses.saveAndFlush(new Course("ANL-101", "Analitika"));
-        courseEmployees.saveAndFlush(new CourseEmployee(course, professor, CourseEmployeeRole.TEACHER));
+        courseEmployees.saveAndFlush(new CourseEmployee(course, new EmployeeReference(professor.getId(),
+                professor.getEmail(), professor.getUsername(), professor.getDisplayName()), CourseEmployeeRole.TEACHER));
         CourseOffering offering = offerings.saveAndFlush(new CourseOffering(course,
                 new CreateOfferingRequest("2026/2027", "Računarstvo", "Osnovne", (short) 2, (short) 3)));
         TeachingGroup group = groups.saveAndFlush(new TeachingGroup(offering, ActivityType.AUDITORY_EXERCISE, "G1"));

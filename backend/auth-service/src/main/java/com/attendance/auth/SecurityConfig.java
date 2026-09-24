@@ -98,7 +98,7 @@ public class SecurityConfig {
                 .cors(cors -> {})
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers("/actuator/health", "/api/auth/**").permitAll()
+                        .requestMatchers("/actuator/health", "/api/auth/**", "/internal/**").permitAll()
                         .requestMatchers("/api/me").hasAnyRole("STUDENT", "EMPLOYEE")
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(server -> server.jwt(jwt ->

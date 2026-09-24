@@ -17,12 +17,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @org.springframework.security.test.context.support.WithMockUser(roles = "EMPLOYEE")
@@ -44,6 +46,9 @@ class CourseControllerTests {
 
     @Autowired
     private LocalUserRepository localUserRepository;
+
+    @MockitoBean
+    private AuthServiceClient authServiceClient;
 
     @BeforeEach
     void setUp() {
@@ -218,10 +223,13 @@ class CourseControllerTests {
         LocalUser assistant = localUserRepository.save(new LocalUser(
                 "asistent", "password", "asistent@etf.unibl.org", "EMPLOYEE"));
         Course course = courseRepository.saveAndFlush(new Course("ORT", "Osnove računarske tehnike"));
-        courseEmployeeRepository.saveAndFlush(new CourseEmployee(course, teacher, CourseEmployeeRole.TEACHER));
+        courseEmployeeRepository.saveAndFlush(new CourseEmployee(course, new EmployeeReference(teacher.getId(),
+                teacher.getEmail(), teacher.getUsername(), teacher.getDisplayName()), CourseEmployeeRole.TEACHER));
         var authentication = jwt().jwt(token -> token.subject(teacher.getId().toString())
                 .claim("role", "EMPLOYEE").claim("email", teacher.getEmail()))
                 .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"));
+        when(authServiceClient.findEmployeeByEmail(assistant.getEmail())).thenReturn(new EmployeeReference(
+                assistant.getId(), assistant.getEmail(), assistant.getUsername(), assistant.getDisplayName()));
         mockMvc.perform(post("/api/courses/{id}/employees", course.getId()).with(authentication)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"asistent@etf.unibl.org\",\"role\":\"ASSISTANT\"}"))

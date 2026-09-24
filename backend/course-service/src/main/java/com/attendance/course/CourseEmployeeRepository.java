@@ -12,6 +12,6 @@ public interface CourseEmployeeRepository extends JpaRepository<CourseEmployee, 
     List<CourseEmployee> findByCourseIdOrderByEmployeeEmail(UUID courseId);
     List<CourseEmployee> findByCourseId(UUID courseId);
 
-    @Query("select assignment.course from CourseEmployee assignment where assignment.employee.id = :employeeId order by assignment.course.code")
+    @Query("select assignment.course from CourseEmployee assignment where assignment.employeeId = :employeeId order by assignment.course.code")
     List<Course> findCoursesByEmployeeId(@Param("employeeId") UUID employeeId);
 }

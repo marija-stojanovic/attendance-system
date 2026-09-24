@@ -1,5 +1,6 @@
 package com.attendance.course.imports;
 
+import com.attendance.course.EmployeeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,6 +30,7 @@ public class ImportCommitController {
             return ResponseEntity.unprocessableEntity().body(preview);
         }
         String year = preview.metadata().academicYear() == null ? academicYear : preview.metadata().academicYear();
-        return ResponseEntity.ok(commitService.commit(preview, year, UUID.fromString(jwt.getSubject())));
+        return ResponseEntity.ok(commitService.commit(preview, year, EmployeeReference.fromToken(
+                UUID.fromString(jwt.getSubject()), jwt.getClaimAsString("email"))));
     }
 }

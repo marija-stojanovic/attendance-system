@@ -2,8 +2,6 @@ package com.attendance.course;
 
 import java.util.List;
 import java.util.UUID;
-import com.attendance.course.security.LocalUser;
-import com.attendance.course.security.LocalUserRepository;
 import com.attendance.course.sessions.TeachingSessionRepository;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -17,18 +15,18 @@ public class CourseService {
 
     private final CourseRepository courseRepository;
     private final CourseEmployeeRepository courseEmployees;
-    private final LocalUserRepository localUsers;
+    private final AuthServiceClient authService;
     private final CourseOfferingRepository offerings;
     private final TeachingGroupRepository groups;
     private final EnrollmentRepository enrollments;
     private final TeachingSessionRepository sessions;
 
     public CourseService(CourseRepository courseRepository, CourseEmployeeRepository courseEmployees,
-            LocalUserRepository localUsers, CourseOfferingRepository offerings, TeachingGroupRepository groups,
+            AuthServiceClient authService, CourseOfferingRepository offerings, TeachingGroupRepository groups,
             EnrollmentRepository enrollments, TeachingSessionRepository sessions) {
         this.courseRepository = courseRepository;
         this.courseEmployees = courseEmployees;
-        this.localUsers = localUsers;
+        this.authService = authService;
         this.offerings = offerings;
         this.groups = groups;
         this.enrollments = enrollments;
@@ -45,11 +43,10 @@ public class CourseService {
     }
 
     @Transactional
-    public CourseResponse create(CreateCourseRequest request, UUID employeeId) {
+    public CourseResponse create(CreateCourseRequest request, EmployeeReference employee) {
         if (courseRepository.existsByCode(request.code())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Predmet sa ovom šifrom već postoji.");
         }
-        LocalUser employee = findEmployee(employeeId);
         Course course = courseRepository.saveAndFlush(new Course(request.code(), request.name()));
         courseEmployees.save(new CourseEmployee(course, employee, CourseEmployeeRole.TEACHER));
         return CourseResponse.from(course);
@@ -104,7 +101,6 @@ public class CourseService {
     }
 
     public List<CourseResponse> findAll(UUID employeeId) {
-        findEmployee(employeeId);
         return courseEmployees.findCoursesByEmployeeId(employeeId).stream().map(CourseResponse::from).toList();
     }
 
@@ -118,9 +114,8 @@ public class CourseService {
     public CourseEmployeeResponse assignEmployee(UUID courseId, UUID requestingEmployeeId,
             AssignCourseEmployeeRequest request) {
         Course course = requireCourseAccess(courseId, requestingEmployeeId);
-        LocalUser employee = localUsers.findByEmailIgnoreCase(request.email())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Zaposleni nije pronađen."));
-        if (courseEmployees.existsByCourseIdAndEmployeeId(courseId, employee.getId())) {
+        EmployeeReference employee = authService.findEmployeeByEmail(request.email());
+        if (courseEmployees.existsByCourseIdAndEmployeeId(courseId, employee.id())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Zaposleni je već povezan sa predmetom.");
         }
         return CourseEmployeeResponse.from(courseEmployees.saveAndFlush(
@@ -136,9 +131,4 @@ public class CourseService {
         return course;
     }
 
-    private LocalUser findEmployee(UUID employeeId) {
-        return localUsers.findById(employeeId)
-                .filter(user -> "EMPLOYEE".equals(user.getRole()))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Zaposleni nije pronađen."));
-    }
 }

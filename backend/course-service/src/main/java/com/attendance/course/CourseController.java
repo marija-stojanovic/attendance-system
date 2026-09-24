@@ -23,7 +23,8 @@ public class CourseController {
     public ResponseEntity<CourseResponse> create(@Valid @RequestBody CreateCourseRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         CourseResponse course = jwt == null ? courseService.create(request)
-                : courseService.create(request, UUID.fromString(jwt.getSubject()));
+                : courseService.create(request, EmployeeReference.fromToken(
+                        UUID.fromString(jwt.getSubject()), jwt.getClaimAsString("email")));
         return ResponseEntity.created(URI.create("/api/courses/" + course.id())).body(course);
     }
 

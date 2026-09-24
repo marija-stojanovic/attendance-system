@@ -11,8 +11,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import com.attendance.course.security.LocalUser;
-import com.attendance.course.security.LocalUserRepository;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -29,13 +27,12 @@ public class ImportCommitService {
     private final StudentRepository students;
     private final EnrollmentRepository enrollments;
     private final CourseEmployeeRepository courseEmployees;
-    private final LocalUserRepository localUsers;
     private final StudentEmailGenerator emails;
     private final TransactionTemplate transactions;
 
     public ImportCommitService(CourseRepository courses, CourseOfferingRepository offerings,
             TeachingGroupRepository groups, StudentRepository students, EnrollmentRepository enrollments,
-            CourseEmployeeRepository courseEmployees, LocalUserRepository localUsers,
+            CourseEmployeeRepository courseEmployees,
             StudentEmailGenerator emails, PlatformTransactionManager manager) {
         this.courses = courses;
         this.offerings = offerings;
@@ -43,12 +40,15 @@ public class ImportCommitService {
         this.students = students;
         this.enrollments = enrollments;
         this.courseEmployees = courseEmployees;
-        this.localUsers = localUsers;
         this.emails = emails;
         this.transactions = new TransactionTemplate(manager);
     }
 
     public ImportResult commit(ImportPreview preview, String academicYear, UUID employeeId) {
+        return commit(preview, academicYear, EmployeeReference.fromToken(employeeId, null));
+    }
+
+    public ImportResult commit(ImportPreview preview, String academicYear, EmployeeReference employee) {
         if (!preview.valid() || preview.metadata() == null || preview.students().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Neispravan fajl nije moguće upisati.");
         }
@@ -59,7 +59,7 @@ public class ImportCommitService {
         }
         for (int attempt = 0; attempt < 5; attempt++) {
             try {
-                return transactions.execute(transaction -> save(preview, year, employeeId));
+                return transactions.execute(transaction -> save(preview, year, employee));
             } catch (DataIntegrityViolationException | ConcurrencyFailureException exception) {
                 if (attempt == 4) {
                     throw conflict("Uvoz nije sačuvan zbog istovremenih izmjena ili sukoba podataka. Ponovite zahtjev.");
@@ -69,12 +69,8 @@ public class ImportCommitService {
         throw new IllegalStateException("Uvoz nije završen.");
     }
 
-    private ImportResult save(ImportPreview preview, String year, UUID employeeId) {
+    private ImportResult save(ImportPreview preview, String year, EmployeeReference employee) {
         var metadata = preview.metadata();
-        LocalUser employee = localUsers.findById(employeeId)
-                .filter(user -> "EMPLOYEE".equals(user.getRole()))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        "Zaposleni nije pronađen."));
         Course course = courses.findByCode(metadata.courseCode()).orElse(null);
         boolean courseCreated = course == null;
         if (courseCreated) {
@@ -82,7 +78,7 @@ public class ImportCommitService {
         } else if (!same(course.getName(), metadata.courseName())) {
             throw conflict("Šifra predmeta postoji sa drugačijim nazivom.");
         }
-        if (!courseEmployees.existsByCourseIdAndEmployeeId(course.getId(), employeeId)) {
+        if (!courseEmployees.existsByCourseIdAndEmployeeId(course.getId(), employee.id())) {
             courseEmployees.saveAndFlush(new CourseEmployee(course, employee, CourseEmployeeRole.TEACHER));
         }
         CourseOffering offering = offerings.findByCourseIdAndAcademicYearAndStudyProgramAndStudyType(

@@ -99,6 +99,25 @@ class AuthControllerTests {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void internalEmployeeLookupRequiresServiceKey() throws Exception {
+        LocalUser employee = users.save(new LocalUser("profesor", passwords.encode("Profesor123!"),
+                "profesor@etf.unibl.org", "EMPLOYEE"));
+
+        mvc.perform(get("/internal/employees/by-email")
+                        .param("email", employee.getEmail())
+                        .header("X-Internal-Key", "local-internal-service-key-change-me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("id").value(employee.getId().toString()))
+                .andExpect(jsonPath("email").value(employee.getEmail()))
+                .andExpect(jsonPath("username").value(employee.getUsername()));
+
+        mvc.perform(get("/internal/employees/by-email")
+                        .param("email", employee.getEmail())
+                        .header("X-Internal-Key", "pogresan-kljuc"))
+                .andExpect(status().isForbidden());
+    }
+
     private Jwt googleToken(String email, String domain) {
         return Jwt.withTokenValue("google-token").header("alg", "RS256")
                 .issuer("https://accounts.google.com").subject("google-subject")
