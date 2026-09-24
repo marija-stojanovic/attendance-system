@@ -10,6 +10,7 @@ import { StudentAttendancePanel } from './StudentAttendancePanel';
 import { AttendanceAnalyticsPanel } from './AttendanceAnalyticsPanel';
 
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8081';
+const analyticsUrl = import.meta.env.VITE_ANALYTICS_URL || 'http://localhost:8082';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 type Identity = { email: string; role: string; studentId: string | null };
 type LoginResponse = { token: string };
@@ -168,7 +169,8 @@ function App() {
           setEmployeeView('courses');
         }} />}
         {employeeView === 'sessions' && <SessionQrPanel apiUrl={apiUrl} token={token} />}
-        {employeeView === 'analytics' && <AttendanceAnalyticsPanel apiUrl={apiUrl} token={token} />}
+        {employeeView === 'analytics' && <AttendanceAnalyticsPanel apiUrl={apiUrl}
+          analyticsUrl={analyticsUrl} token={token} />}
       </>}
     </> : registration ? <section>
       <h2>Završetak registracije</h2>

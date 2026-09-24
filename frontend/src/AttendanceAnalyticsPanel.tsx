@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-type Props = { apiUrl: string; token: string };
+type Props = { apiUrl: string; analyticsUrl: string; token: string };
 type Course = { id: string; code: string; name: string };
 type Offering = {
   id: string;
@@ -112,7 +112,7 @@ function GroupChart({ groups }: { groups: GroupComparison[] }) {
   </div>;
 }
 
-export function AttendanceAnalyticsPanel({ apiUrl, token }: Props) {
+export function AttendanceAnalyticsPanel({ apiUrl, analyticsUrl, token }: Props) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseId, setCourseId] = useState('');
   const [offerings, setOfferings] = useState<Offering[]>([]);
@@ -122,8 +122,8 @@ export function AttendanceAnalyticsPanel({ apiUrl, token }: Props) {
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
 
-  async function request<T>(path: string, signal: AbortSignal): Promise<T> {
-    const response = await fetch(apiUrl + path, {
+  async function request<T>(baseUrl: string, path: string, signal: AbortSignal): Promise<T> {
+    const response = await fetch(baseUrl + path, {
       signal,
       headers: { Authorization: 'Bearer ' + token }
     });
@@ -138,7 +138,7 @@ export function AttendanceAnalyticsPanel({ apiUrl, token }: Props) {
     const controller = new AbortController();
     setLoading(true);
     setError('');
-    request<Course[]>('/api/courses', controller.signal).then(result => {
+    request<Course[]>(apiUrl, '/api/courses', controller.signal).then(result => {
       setCourses(result);
       setCourseId(current => result.some(course => course.id === current) ? current : result[0]?.id || '');
     }).catch(e => {
@@ -157,7 +157,7 @@ export function AttendanceAnalyticsPanel({ apiUrl, token }: Props) {
     const controller = new AbortController();
     setLoading(true);
     setError('');
-    request<Offering[]>('/api/courses/' + courseId + '/offerings', controller.signal).then(result => {
+    request<Offering[]>(apiUrl, '/api/courses/' + courseId + '/offerings', controller.signal).then(result => {
       setOfferings(result);
       setOfferingId(result[0]?.id || '');
     }).catch(e => {
@@ -174,14 +174,15 @@ export function AttendanceAnalyticsPanel({ apiUrl, token }: Props) {
     const controller = new AbortController();
     setLoading(true);
     setError('');
-    request<AnalyticsSummary>('/api/offerings/' + offeringId + '/attendance-summary', controller.signal)
+    request<AnalyticsSummary>(analyticsUrl,
+      '/api/analytics/offerings/' + offeringId + '/attendance-summary', controller.signal)
       .then(setSummary).catch(e => {
         if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Analitika nije dostupna.');
       }).finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [apiUrl, token, offeringId, reload]);
+  }, [analyticsUrl, token, offeringId, reload]);
 
   const averageAttendance = useMemo(() => {
     if (!summary?.students.length) return 0;

@@ -18,6 +18,9 @@ import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 public class AnalyticsSecurity {
@@ -44,6 +47,7 @@ public class AnalyticsSecurity {
         converter.setJwtGrantedAuthoritiesConverter(jwt -> "EMPLOYEE".equals(jwt.getClaimAsString("role"))
                 ? List.of(new SimpleGrantedAuthority("ROLE_EMPLOYEE")) : List.of());
         return http.csrf(csrf -> csrf.disable())
+                .cors(cors -> {})
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health").permitAll()
@@ -51,5 +55,17 @@ public class AnalyticsSecurity {
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(o -> o.jwt(j -> j.decoder(decoder).jwtAuthenticationConverter(converter)))
                 .build();
+    }
+
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(@Value("${authentication.allowed-origins}") String origins) {
+        CorsConfiguration cors = new CorsConfiguration();
+        cors.setAllowedOrigins(java.util.Arrays.stream(origins.split(","))
+                .map(String::trim).filter(value -> !value.isBlank()).toList());
+        cors.setAllowedMethods(List.of("GET", "OPTIONS"));
+        cors.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", cors);
+        return source;
     }
 }

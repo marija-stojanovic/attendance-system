@@ -7,6 +7,7 @@ services:
       args:
         VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
         VITE_API_URL: ${FRONTEND_API_URL:-http://localhost:8081}
+        VITE_ANALYTICS_URL: ${FRONTEND_ANALYTICS_URL:-http://localhost:8082}
     ports:
       - "5173:80"
 
@@ -52,6 +53,26 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --spider http://localhost:8081/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  analytics-service:
+    build:
+      context: ./backend/analytics-service
+    environment:
+      COURSE_SERVICE_URL: http://course-service:8081
+      APP_JWT_SECRET: ${APP_JWT_SECRET:-local-development-secret-change-me-123456789}
+      ATTENDANCE_THRESHOLD_PERCENT: ${ATTENDANCE_THRESHOLD_PERCENT:-75}
+      FRONTEND_ALLOWED_ORIGINS: ${FRONTEND_ALLOWED_ORIGINS:-http://localhost:5173}
+    ports:
+      - "${ANALYTICS_SERVICE_PORT:-8082}:8082"
+    depends_on:
+      course-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://localhost:8082/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
