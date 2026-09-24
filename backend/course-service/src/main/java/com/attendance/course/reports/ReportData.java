@@ -33,30 +33,10 @@ public final class ReportData {
 
     public record ActivityGroup(ActivityType activityType, String groupNumber) {}
 
-    public record SessionSummary(UUID id, LocalDate date, LocalTime startTime, ActivityType activityType,
-                                 String groupNumber, int expectedStudents, int presentStudents,
-                                 BigDecimal attendancePercent) {}
-
-    public record TrendPoint(LocalDate date, int closedSessions, int expectedAttendances,
-                             int recordedAttendances, BigDecimal attendancePercent) {}
-
-    public record GroupComparison(ActivityType activityType, String groupNumber, int closedSessions,
-                                  int students, int expectedAttendances, int recordedAttendances,
-                                  BigDecimal attendancePercent) {}
-
     public record Summary(Offering offering, int closedSessions, List<ActivityGroup> activityGroups,
-                          BigDecimal lowAttendanceThresholdPercent,
-                          List<StudentSummary> lowAttendanceStudents,
-                          List<SessionSummary> sessions,
-                          List<TrendPoint> attendanceTrend,
-                          List<GroupComparison> groupComparisons,
                           List<StudentSummary> students) {
         public Summary {
             activityGroups = List.copyOf(activityGroups);
-            lowAttendanceStudents = List.copyOf(lowAttendanceStudents);
-            sessions = List.copyOf(sessions);
-            attendanceTrend = List.copyOf(attendanceTrend);
-            groupComparisons = List.copyOf(groupComparisons);
             students = List.copyOf(students);
         }
     }
