@@ -2,8 +2,6 @@ package com.attendance.course.attendance;
 
 import com.attendance.course.*;
 import com.attendance.course.sessions.*;
-import com.attendance.course.security.LocalUser;
-import com.attendance.course.security.LocalUserRepository;
 import com.attendance.course.reports.AttendanceReportDataService;
 import com.attendance.course.reports.AttendanceSummaryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -66,7 +64,6 @@ class AttendanceTests {
     @Autowired private CourseOfferingRepository offerings;
     @Autowired private CourseRepository courses;
     @Autowired private CourseEmployeeRepository courseEmployees;
-    @Autowired private LocalUserRepository localUsers;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private AttendanceReportDataService reportData;
     @Autowired private AttendanceSummaryService attendanceSummary;
@@ -77,7 +74,7 @@ class AttendanceTests {
     private CourseOffering offering;
     private TeachingGroup lecture;
     private Course course;
-    private LocalUser employee;
+    private TestEmployee employee;
 
     @BeforeEach
     void setUp() {
@@ -90,10 +87,8 @@ class AttendanceTests {
         offerings.deleteAll();
         courseEmployees.deleteAll();
         courses.deleteAll();
-        localUsers.deleteAll();
         course = courses.saveAndFlush(new Course("ATT-1", "Evidencija prisustva"));
-        employee = localUsers.saveAndFlush(new LocalUser("attendance-professor", "hash",
-                "attendance.professor@etf.unibl.org", "EMPLOYEE", "Profesor Evidencije"));
+        employee = employee("attendance-professor", "attendance.professor@etf.unibl.org", "Profesor Evidencije");
         courseEmployees.saveAndFlush(new CourseEmployee(course, new EmployeeReference(employee.getId(),
                 employee.getEmail(), employee.getUsername(), employee.getDisplayName()), CourseEmployeeRole.TEACHER));
         offering = offerings.saveAndFlush(new CourseOffering(course,
@@ -166,8 +161,7 @@ class AttendanceTests {
                         .content(body(qr.current(session.getId()).token())))
                 .andExpect(status().isOk());
         UUID attendanceId = attendances.findAll().getFirst().getId();
-        LocalUser other = localUsers.saveAndFlush(new LocalUser("other-professor", "hash",
-                "other.professor@etf.unibl.org", "EMPLOYEE"));
+        TestEmployee other = employee("other-professor", "other.professor@etf.unibl.org");
 
         mvc.perform(get("/api/sessions/{sessionId}/attendances", session.getId()).with(employeeJwt(other)))
                 .andExpect(status().isForbidden());
@@ -406,8 +400,8 @@ class AttendanceTests {
 
     @Test
     void reportDataContainsSessionMetadataStaffAndOnlyPresentStudents() {
-        LocalUser assistant = localUsers.saveAndFlush(new LocalUser("attendance-assistant", "hash",
-                "attendance.assistant@etf.unibl.org", "EMPLOYEE", "Asistent Nastave"));
+        TestEmployee assistant = employee("attendance-assistant", "attendance.assistant@etf.unibl.org",
+                "Asistent Nastave");
         courseEmployees.saveAndFlush(new CourseEmployee(course, new EmployeeReference(assistant.getId(),
                 assistant.getEmail(), assistant.getUsername(), assistant.getDisplayName()), CourseEmployeeRole.ASSISTANT));
         TeachingSession session = activeSession(lecture);
@@ -436,7 +430,7 @@ class AttendanceTests {
     @Test
     void reportDataRejectsEmployeeNotAssignedToCourse() {
         TeachingSession session = activeSession(lecture);
-        LocalUser other = localUsers.saveAndFlush(new LocalUser("other", "hash", "other@etf.unibl.org", "EMPLOYEE"));
+        TestEmployee other = employee("other", "other@etf.unibl.org");
 
         assertThatThrownBy(() -> reportData.session(session.getId(), other.getId()))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
@@ -480,7 +474,7 @@ class AttendanceTests {
     @Test
     void sessionExcelIsUnavailableToUnassignedEmployeeAndStudent() throws Exception {
         TeachingSession session = activeSession(lecture);
-        LocalUser other = localUsers.saveAndFlush(new LocalUser("other", "hash", "other@etf.unibl.org", "EMPLOYEE"));
+        TestEmployee other = employee("other", "other@etf.unibl.org");
 
         mvc.perform(get("/api/sessions/{sessionId}/report.xlsx", session.getId())
                         .with(employeeJwt(other)))
@@ -521,7 +515,7 @@ class AttendanceTests {
     @Test
     void sessionPdfIsUnavailableToUnassignedEmployeeAndStudent() throws Exception {
         TeachingSession session = activeSession(lecture);
-        LocalUser other = localUsers.saveAndFlush(new LocalUser("other", "hash", "other@etf.unibl.org", "EMPLOYEE"));
+        TestEmployee other = employee("other", "other@etf.unibl.org");
 
         mvc.perform(get("/api/sessions/{sessionId}/report.pdf", session.getId())
                         .with(employeeJwt(other)))
@@ -624,7 +618,7 @@ class AttendanceTests {
         assertThat(summary.activityGroups()).isEmpty();
         assertThat(summary.closedSessions()).isZero();
 
-        LocalUser other = localUsers.saveAndFlush(new LocalUser("other", "hash", "other@etf.unibl.org", "EMPLOYEE"));
+        TestEmployee other = employee("other", "other@etf.unibl.org");
         mvc.perform(get("/api/offerings/{offeringId}/attendance-summary.pdf", offering.getId())
                         .with(employeeJwt(other)))
                 .andExpect(status().isForbidden());
@@ -703,9 +697,24 @@ class AttendanceTests {
         int send(int number) throws Exception;
     }
 
-    private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor employeeJwt(LocalUser user) {
+    private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor employeeJwt(TestEmployee user) {
         return jwt().authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE")).jwt(value ->
                 value.subject(user.getId().toString()).claim("role", "EMPLOYEE").claim("email", user.getEmail()));
+    }
+
+    private TestEmployee employee(String username, String email) {
+        return employee(username, email, username);
+    }
+
+    private TestEmployee employee(String username, String email, String displayName) {
+        return new TestEmployee(UUID.randomUUID(), username, email, displayName);
+    }
+
+    private record TestEmployee(UUID id, String username, String email, String displayName) {
+        UUID getId() { return id; }
+        String getUsername() { return username; }
+        String getEmail() { return email; }
+        String getDisplayName() { return displayName; }
     }
 
     private String body(String token) throws Exception {

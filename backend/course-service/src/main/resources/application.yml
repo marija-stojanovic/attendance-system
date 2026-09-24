@@ -112,12 +112,5 @@ authentication:
   app-issuer: https://attendance-system.local
   audience: course-service
   jwt-secret: ${APP_JWT_SECRET:local-development-secret-change-me-123456789}
-  token-lifetime-seconds: 1800
-  google-client-id: ${GOOGLE_CLIENT_ID:}
-  student-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.unibl.org}
   frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
   allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:${FRONTEND_ORIGIN:http://localhost:5173}}
-  test-employee-enabled: ${TEST_EMPLOYEE_ENABLED:true}
-  test-employee-username: ${TEST_EMPLOYEE_USERNAME:profesor}
-  test-employee-password: ${TEST_EMPLOYEE_PASSWORD:Profesor123!}
-  test-employee-email: ${TEST_EMPLOYEE_EMAIL:profesor@etf.unibl.org}

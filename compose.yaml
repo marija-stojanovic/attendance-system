@@ -7,6 +7,7 @@ services:
       args:
         VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
         VITE_API_URL: ${FRONTEND_API_URL:-http://localhost:8081}
+        VITE_AUTH_URL: ${FRONTEND_AUTH_URL:-http://localhost:8083}
         VITE_ANALYTICS_URL: ${FRONTEND_ANALYTICS_URL:-http://localhost:8082}
     ports:
       - "5173:80"
@@ -35,14 +36,9 @@ services:
       DB_USERNAME: ${POSTGRES_USER:-course_user}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-course_password}
       STUDENT_EMAIL_DOMAIN: ${STUDENT_EMAIL_DOMAIN:-student.etf.unibl.org}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       APP_JWT_SECRET: ${APP_JWT_SECRET:-local-development-secret-change-me-123456789}
       QR_ROTATION_SECONDS: ${QR_ROTATION_SECONDS:-30}
       SESSION_MAX_ACTIVE_SECONDS: ${SESSION_MAX_ACTIVE_SECONDS:-14400}
-      TEST_EMPLOYEE_ENABLED: ${TEST_EMPLOYEE_ENABLED:-true}
-      TEST_EMPLOYEE_USERNAME: ${TEST_EMPLOYEE_USERNAME:-profesor}
-      TEST_EMPLOYEE_PASSWORD: ${TEST_EMPLOYEE_PASSWORD:-Profesor123!}
-      TEST_EMPLOYEE_EMAIL: ${TEST_EMPLOYEE_EMAIL:-profesor@etf.unibl.org}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
       FRONTEND_ALLOWED_ORIGINS: ${FRONTEND_ALLOWED_ORIGINS:-http://localhost:5173}
       AUTH_SERVICE_URL: http://auth-service:8083
@@ -104,7 +100,7 @@ services:
       retries: 10
       start_period: 20s
     depends_on:
-      postgres:
+      course-service:
         condition: service_healthy
 
 volumes:

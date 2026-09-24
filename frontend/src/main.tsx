@@ -10,6 +10,7 @@ import { StudentAttendancePanel } from './StudentAttendancePanel';
 import { AttendanceAnalyticsPanel } from './AttendanceAnalyticsPanel';
 
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8081';
+const authUrl = import.meta.env.VITE_AUTH_URL || 'http://localhost:8083';
 const analyticsUrl = import.meta.env.VITE_ANALYTICS_URL || 'http://localhost:8082';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 type Identity = { email: string; role: string; studentId: string | null };
@@ -37,7 +38,7 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(apiUrl + '/api/me', {
+      const response = await fetch(authUrl + '/api/me', {
         headers: { Authorization: 'Bearer ' + accessToken }
       });
       if (!response.ok) {
@@ -59,7 +60,7 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(apiUrl + path, {
+      const response = await fetch(authUrl + path, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
       if (!response.ok) throw new Error('Prijava nije uspjela. Provjerite unesene podatke.');
@@ -74,7 +75,7 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(apiUrl + '/api/auth/google', {
+      const response = await fetch(authUrl + '/api/auth/google', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ credential })
       });
       if (!response.ok) throw new Error('Google prijava nije prihvaćena. Provjerite fakultetski nalog.');
@@ -97,7 +98,7 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(apiUrl + '/api/auth/register', {
+      const response = await fetch(authUrl + '/api/auth/register', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ registrationToken: registration.token, indexNumber, firstName, lastName })
       });

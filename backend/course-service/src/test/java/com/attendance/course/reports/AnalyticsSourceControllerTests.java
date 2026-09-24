@@ -18,8 +18,6 @@ import com.attendance.course.TeachingGroup;
 import com.attendance.course.TeachingGroupRepository;
 import com.attendance.course.attendance.Attendance;
 import com.attendance.course.attendance.AttendanceRepository;
-import com.attendance.course.security.LocalUser;
-import com.attendance.course.security.LocalUserRepository;
 import com.attendance.course.sessions.TeachingSession;
 import com.attendance.course.sessions.TeachingSessionRepository;
 import com.attendance.course.sessions.TeachingSessionService;
@@ -46,7 +44,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class AnalyticsSourceControllerTests {
     @Autowired MockMvc mvc;
-    @Autowired LocalUserRepository users;
     @Autowired CourseRepository courses;
     @Autowired CourseEmployeeRepository courseEmployees;
     @Autowired CourseOfferingRepository offerings;
@@ -59,11 +56,10 @@ class AnalyticsSourceControllerTests {
 
     @Test
     void returnsOnlyCourseDataToAssignedEmployee() throws Exception {
-        LocalUser professor = users.saveAndFlush(new LocalUser("analytics-professor", "hash",
-                "analytics-professor@etf.org", "EMPLOYEE"));
+        EmployeeReference professor = new EmployeeReference(UUID.randomUUID(), "analytics-professor@etf.org",
+                "analytics-professor", "Profesor analitike");
         Course course = courses.saveAndFlush(new Course("ANL-101", "Analitika"));
-        courseEmployees.saveAndFlush(new CourseEmployee(course, new EmployeeReference(professor.getId(),
-                professor.getEmail(), professor.getUsername(), professor.getDisplayName()), CourseEmployeeRole.TEACHER));
+        courseEmployees.saveAndFlush(new CourseEmployee(course, professor, CourseEmployeeRole.TEACHER));
         CourseOffering offering = offerings.saveAndFlush(new CourseOffering(course,
                 new CreateOfferingRequest("2026/2027", "Računarstvo", "Osnovne", (short) 2, (short) 3)));
         TeachingGroup group = groups.saveAndFlush(new TeachingGroup(offering, ActivityType.AUDITORY_EXERCISE, "G1"));
@@ -86,7 +82,7 @@ class AnalyticsSourceControllerTests {
         mvc.perform(get(path).with(jwt().jwt(token -> token.subject(UUID.randomUUID().toString()))
                 .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
                 .andExpect(status().isForbidden());
-        mvc.perform(get(path).with(jwt().jwt(token -> token.subject(professor.getId().toString()))
+        mvc.perform(get(path).with(jwt().jwt(token -> token.subject(professor.id().toString()))
                 .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enrollments.length()").value(1))

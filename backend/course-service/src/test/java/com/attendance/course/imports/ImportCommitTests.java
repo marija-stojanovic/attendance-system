@@ -1,12 +1,11 @@
 package com.attendance.course.imports;
 
 import com.attendance.course.*;
-import com.attendance.course.security.LocalUser;
-import com.attendance.course.security.LocalUserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
@@ -41,11 +40,10 @@ class ImportCommitTests {
     @Autowired private StudentRepository students;
     @Autowired private EnrollmentRepository enrollments;
     @Autowired private CourseEmployeeRepository courseEmployees;
-    @Autowired private LocalUserRepository localUsers;
     @Autowired private ImportPreviewService previews;
     @Autowired private ImportCommitService imports;
     @Autowired private JdbcTemplate jdbc;
-    private LocalUser employee;
+    private UUID employeeId;
 
     @BeforeEach
     void clear() {
@@ -55,8 +53,7 @@ class ImportCommitTests {
         courseEmployees.deleteAll();
         students.deleteAll();
         courses.deleteAll();
-        localUsers.deleteAll();
-        employee = localUsers.saveAndFlush(new LocalUser("profesor", "hash", "profesor@etf.unibl.org", "EMPLOYEE"));
+        employeeId = UUID.randomUUID();
     }
 
     @Test
@@ -77,7 +74,7 @@ class ImportCommitTests {
         assertThat(students.count()).isEqualTo(2);
         assertThat(enrollments.count()).isEqualTo(2);
         assertThat(courseEmployees.existsByCourseIdAndEmployeeId(
-                java.util.UUID.fromString(first.get("courseId").asText()), employee.getId())).isTrue();
+                java.util.UUID.fromString(first.get("courseId").asText()), employeeId)).isTrue();
         mvc.perform(get("/api/courses").with(employeeJwt()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
         mvc.perform(get("/api/groups/" + first.get("groupId").asText() + "/students").with(employeeJwt()))
@@ -318,7 +315,7 @@ class ImportCommitTests {
         CyclicBarrier barrier = new CyclicBarrier(2);
         Callable<ImportResult> operation = () -> {
             barrier.await(10, TimeUnit.SECONDS);
-            return imports.commit(preview, "2026/2027", employee.getId());
+            return imports.commit(preview, "2026/2027", employeeId);
         };
         try (var executor = Executors.newFixedThreadPool(2)) {
             var futures = executor.invokeAll(List.of(operation, operation), 40, TimeUnit.SECONDS);
@@ -344,7 +341,8 @@ class ImportCommitTests {
     }
 
     private RequestPostProcessor employeeJwt() {
-        return jwt().jwt(token -> token.subject(employee.getId().toString()).claim("role", "EMPLOYEE"))
+        return jwt().jwt(token -> token.subject(employeeId.toString()).claim("role", "EMPLOYEE")
+                        .claim("email", "profesor@etf.unibl.org"))
                 .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"));
     }
 
