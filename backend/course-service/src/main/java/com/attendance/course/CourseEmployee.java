@@ -1,6 +1,5 @@
 package com.attendance.course;
 
-import com.attendance.course.security.LocalUser;
 import jakarta.persistence.*;
 import java.util.UUID;
 
@@ -15,9 +14,17 @@ public class CourseEmployee {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "employee_id", nullable = false)
-    private LocalUser employee;
+    @Column(name = "employee_id", nullable = false)
+    private UUID employeeId;
+
+    @Column(name = "employee_email", nullable = false)
+    private String employeeEmail;
+
+    @Column(name = "employee_username", nullable = false, length = 100)
+    private String employeeUsername;
+
+    @Column(name = "employee_display_name", nullable = false, length = 200)
+    private String employeeDisplayName;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -25,14 +32,20 @@ public class CourseEmployee {
 
     protected CourseEmployee() {}
 
-    public CourseEmployee(Course course, LocalUser employee, CourseEmployeeRole role) {
+    public CourseEmployee(Course course, EmployeeReference employee, CourseEmployeeRole role) {
         this.course = course;
-        this.employee = employee;
+        this.employeeId = employee.id();
+        this.employeeEmail = employee.email();
+        this.employeeUsername = employee.username();
+        this.employeeDisplayName = employee.displayName();
         this.role = role;
     }
 
     public UUID getId() { return id; }
     public Course getCourse() { return course; }
-    public LocalUser getEmployee() { return employee; }
+    public UUID getEmployeeId() { return employeeId; }
+    public String getEmployeeEmail() { return employeeEmail; }
+    public String getEmployeeUsername() { return employeeUsername; }
+    public String getEmployeeDisplayName() { return employeeDisplayName; }
     public CourseEmployeeRole getRole() { return role; }
 }

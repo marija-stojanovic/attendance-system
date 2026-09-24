@@ -94,7 +94,8 @@ class AttendanceTests {
         course = courses.saveAndFlush(new Course("ATT-1", "Evidencija prisustva"));
         employee = localUsers.saveAndFlush(new LocalUser("attendance-professor", "hash",
                 "attendance.professor@etf.unibl.org", "EMPLOYEE", "Profesor Evidencije"));
-        courseEmployees.saveAndFlush(new CourseEmployee(course, employee, CourseEmployeeRole.TEACHER));
+        courseEmployees.saveAndFlush(new CourseEmployee(course, new EmployeeReference(employee.getId(),
+                employee.getEmail(), employee.getUsername(), employee.getDisplayName()), CourseEmployeeRole.TEACHER));
         offering = offerings.saveAndFlush(new CourseOffering(course,
                 new CreateOfferingRequest("2026/2027", "Računarstvo", "OSNOVNE", (short) 1, (short) 1)));
         lecture = groups.saveAndFlush(new TeachingGroup(offering, ActivityType.LECTURE, "ALL"));
@@ -407,7 +408,8 @@ class AttendanceTests {
     void reportDataContainsSessionMetadataStaffAndOnlyPresentStudents() {
         LocalUser assistant = localUsers.saveAndFlush(new LocalUser("attendance-assistant", "hash",
                 "attendance.assistant@etf.unibl.org", "EMPLOYEE", "Asistent Nastave"));
-        courseEmployees.saveAndFlush(new CourseEmployee(course, assistant, CourseEmployeeRole.ASSISTANT));
+        courseEmployees.saveAndFlush(new CourseEmployee(course, new EmployeeReference(assistant.getId(),
+                assistant.getEmail(), assistant.getUsername(), assistant.getDisplayName()), CourseEmployeeRole.ASSISTANT));
         TeachingSession session = activeSession(lecture);
         attendances.saveAndFlush(new Attendance(session, student, start,
                 "203.0.113.25", "Test Browser", UUID.randomUUID()));

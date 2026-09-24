@@ -45,6 +45,8 @@ services:
       TEST_EMPLOYEE_EMAIL: ${TEST_EMPLOYEE_EMAIL:-profesor@etf.unibl.org}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
       FRONTEND_ALLOWED_ORIGINS: ${FRONTEND_ALLOWED_ORIGINS:-http://localhost:5173}
+      AUTH_SERVICE_URL: http://auth-service:8083
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-local-internal-service-key-change-me}
     ports:
       - "${COURSE_SERVICE_PORT:-8081}:8081"
     depends_on:
@@ -92,6 +94,7 @@ services:
       TEST_EMPLOYEE_PASSWORD: ${TEST_EMPLOYEE_PASSWORD:-Profesor123!}
       TEST_EMPLOYEE_EMAIL: ${TEST_EMPLOYEE_EMAIL:-profesor@etf.unibl.org}
       FRONTEND_ALLOWED_ORIGINS: ${FRONTEND_ALLOWED_ORIGINS:-http://localhost:5173}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-local-internal-service-key-change-me}
     ports:
       - "${AUTH_SERVICE_PORT:-8083}:8083"
     healthcheck:
@@ -101,7 +104,7 @@ services:
       retries: 10
       start_period: 20s
     depends_on:
-      course-service:
+      postgres:
         condition: service_healthy
 
 volumes:

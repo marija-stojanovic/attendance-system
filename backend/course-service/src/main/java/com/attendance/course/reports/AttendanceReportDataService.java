@@ -50,11 +50,11 @@ public class AttendanceReportDataService {
     private ReportData.Offering offeringData(CourseOffering offering, UUID employeeId) {
         var course = offering.getCourse();
         var assigned = courseEmployees.findByCourseIdOrderByEmployeeEmail(course.getId());
-        if (assigned.stream().noneMatch(item -> item.getEmployee().getId().equals(employeeId))) {
+        if (assigned.stream().noneMatch(item -> item.getEmployeeId().equals(employeeId))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Nemate pristup izvještaju ovog predmeta.");
         }
         var employees = assigned.stream().map(item -> new ReportData.Employee(
-                item.getEmployee().getDisplayName(), item.getEmployee().getEmail(), item.getRole())).toList();
+                item.getEmployeeDisplayName(), item.getEmployeeEmail(), item.getRole())).toList();
         return new ReportData.Offering(offering.getId(), course.getCode(), course.getName(),
                 offering.getAcademicYear(), offering.getStudyProgram(), offering.getStudyType(),
                 offering.getYearOfStudy(), offering.getSemester(), employees);

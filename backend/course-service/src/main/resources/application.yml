@@ -98,6 +98,10 @@ group-assignment:
 server:
   port: 8081
 
+auth-service:
+  base-url: ${AUTH_SERVICE_URL:http://localhost:8083}
+  internal-key: ${INTERNAL_SERVICE_KEY:local-internal-service-key-change-me}
+
 management:
   endpoints:
     web:

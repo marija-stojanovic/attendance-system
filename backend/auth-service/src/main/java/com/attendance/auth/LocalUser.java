@@ -39,7 +39,9 @@ public class LocalUser {
     }
 
     public UUID getId() { return id; }
+    public String getUsername() { return username; }
     public String getPasswordHash() { return passwordHash; }
     public String getEmail() { return email; }
+    public String getDisplayName() { return displayName; }
     public String getRole() { return role; }
 }
