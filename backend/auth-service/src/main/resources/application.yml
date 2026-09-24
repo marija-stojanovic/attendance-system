@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: auth-service
+
+server:
+  port: 8083
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+authentication:
+  app-issuer: https://attendance-system.local
+  audience: course-service
+  jwt-secret: ${APP_JWT_SECRET:local-development-secret-change-me-123456789}
+  token-lifetime-seconds: 1800
+  allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:5173}
