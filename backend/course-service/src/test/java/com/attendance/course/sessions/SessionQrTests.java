@@ -1,7 +1,10 @@
 package com.attendance.course.sessions;
 
 import com.attendance.course.*;
-import com.attendance.course.security.TokenService;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jwt.JWTClaimsSet;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.RGBLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
@@ -49,7 +52,6 @@ class SessionQrTests {
     @Autowired private CourseRepository courses;
     @Autowired private CourseOfferingRepository offerings;
     @Autowired private TeachingGroupRepository groups;
-    @Autowired private TokenService loginTokens;
     @Autowired private SecretKey applicationKey;
     @Autowired private MockMvc mvc;
     @MockitoBean private Clock qrClock;
@@ -162,8 +164,12 @@ class SessionQrTests {
     @Test
     void separatesQrTokensFromLoginTokens() throws Exception {
         service.activate(id);
-        var login = loginTokens.issue(id.toString(), "test@example.org", "EMPLOYEE", "local", "test");
-        assertThatThrownBy(() -> qr.validate(id, login.token())).isInstanceOf(ResponseStatusException.class);
+        SignedJWT login = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), new JWTClaimsSet.Builder()
+                .issuer("https://attendance-system.local").subject(id.toString()).audience("course-service")
+                .issueTime(java.util.Date.from(start)).expirationTime(java.util.Date.from(start.plusSeconds(300)))
+                .claim("email", "test@example.org").claim("role", "EMPLOYEE").build());
+        login.sign(new MACSigner(applicationKey.getEncoded()));
+        assertThatThrownBy(() -> qr.validate(id, login.serialize())).isInstanceOf(ResponseStatusException.class);
         mvc.perform(get("/api/sessions/{id}/qr", id)
                 .header("Authorization", "Bearer " + qr.current(id).token())).andExpect(status().isUnauthorized());
     }
