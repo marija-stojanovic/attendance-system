@@ -4,16 +4,21 @@ import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:auth_token_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "authentication.test-employee-enabled=false",
+        "authentication.google-client-id=test-client" })
 class TokenServiceTests {
     @Autowired private TokenService tokens;
-    @Autowired private JwtDecoder decoder;
+    @Autowired @Qualifier("applicationJwtDecoder") private JwtDecoder decoder;
 
     @Test
     void issuesApplicationTokenWithExistingClaims() {

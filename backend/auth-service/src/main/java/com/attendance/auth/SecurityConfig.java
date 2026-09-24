@@ -9,15 +9,20 @@ import java.util.List;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
@@ -62,10 +67,33 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain security(HttpSecurity http, JwtDecoder decoder) throws Exception {
+    JwtDecoder googleJwtDecoder(@Value("${authentication.google-client-id}") String clientId) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri("https://www.googleapis.com/oauth2/v3/certs")
+                .jwsAlgorithm(SignatureAlgorithm.RS256).build();
+        org.springframework.security.oauth2.core.OAuth2TokenValidator<Jwt> claims = jwt -> {
+            String issuer = jwt.getIssuer() == null ? "" : jwt.getIssuer().toString();
+            boolean valid = (issuer.equals("https://accounts.google.com") || issuer.equals("accounts.google.com"))
+                    && !clientId.isBlank() && jwt.getAudience().contains(clientId)
+                    && jwt.getSubject() != null && !jwt.getSubject().isBlank();
+            return valid ? OAuth2TokenValidatorResult.success()
+                    : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token"));
+        };
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(new JwtTimestampValidator(), claims));
+        return decoder;
+    }
+
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    SecurityFilterChain security(HttpSecurity http,
+            @Qualifier("applicationJwtDecoder") JwtDecoder applicationJwtDecoder,
+            IdentityPolicy policy) throws Exception {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(jwt -> List.of(
-                new SimpleGrantedAuthority("ROLE_" + jwt.getClaimAsString("role"))));
+                new SimpleGrantedAuthority("ROLE_" + policy.role(jwt))));
         return http.csrf(csrf -> csrf.disable())
                 .cors(cors -> {})
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -74,7 +102,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/me").hasAnyRole("STUDENT", "EMPLOYEE")
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(server -> server.jwt(jwt ->
-                        jwt.decoder(decoder).jwtAuthenticationConverter(converter)))
+                        jwt.decoder(applicationJwtDecoder).jwtAuthenticationConverter(converter)))
                 .build();
     }
 
