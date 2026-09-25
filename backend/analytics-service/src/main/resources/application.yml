@@ -18,13 +18,20 @@ management:
         include: health,info
 
 course-service:
-  base-url: ${COURSE_SERVICE_URL:http://localhost:8081}
+  base-url: http://course-service
 
 attendance-analytics:
   low-attendance-threshold-percent: ${ATTENDANCE_THRESHOLD_PERCENT:75}
 
 analytics-service:
   internal-key: ${INTERNAL_SERVICE_KEY:local-internal-service-key-change-me}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
 
 authentication:
   app-issuer: https://attendance-system.local
