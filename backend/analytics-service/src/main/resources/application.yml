@@ -23,6 +23,9 @@ course-service:
 attendance-analytics:
   low-attendance-threshold-percent: ${ATTENDANCE_THRESHOLD_PERCENT:75}
 
+analytics-service:
+  internal-key: ${INTERNAL_SERVICE_KEY:local-internal-service-key-change-me}
+
 authentication:
   app-issuer: https://attendance-system.local
   audience: course-service

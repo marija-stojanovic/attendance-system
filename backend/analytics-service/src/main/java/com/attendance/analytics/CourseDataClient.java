@@ -38,4 +38,16 @@ public class CourseDataClient {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Servis predmeta nije dostupan.");
         }
     }
+
+    public void requireAccess(UUID offeringId, String bearerToken) {
+        try {
+            client.get().uri("/api/offerings/{id}/analytics-access", offeringId)
+                    .headers(headers -> headers.setBearerAuth(bearerToken))
+                    .retrieve().toBodilessEntity();
+        } catch (HttpClientErrorException error) {
+            throw new ResponseStatusException(error.getStatusCode(), "Podaci predmeta nisu dostupni.");
+        } catch (RestClientException error) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Servis predmeta nije dostupan.");
+        }
+    }
 }
