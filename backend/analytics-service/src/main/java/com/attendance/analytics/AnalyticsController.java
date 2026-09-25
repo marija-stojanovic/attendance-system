@@ -25,7 +25,12 @@ public class AnalyticsController {
     @GetMapping("/{offeringId}/attendance-summary")
     public AnalyticsData.Summary summary(@PathVariable UUID offeringId,
             @AuthenticationPrincipal Jwt jwt) {
-        snapshots.save(offeringId, courses.load(offeringId, jwt.getTokenValue()));
-        return calculator.calculate(snapshots.load(offeringId));
+        courses.requireAccess(offeringId, jwt.getTokenValue());
+        var source = snapshots.load(offeringId).orElseGet(() -> {
+            var loaded = courses.load(offeringId, jwt.getTokenValue());
+            snapshots.save(offeringId, loaded);
+            return loaded;
+        });
+        return calculator.calculate(source);
     }
 }

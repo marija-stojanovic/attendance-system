@@ -30,6 +30,11 @@ public class AnalyticsSourceService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public AnalyticsSourceData load(UUID offeringId, UUID employeeId) {
         reports.offering(offeringId, employeeId);
+        return loadInternal(offeringId);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public AnalyticsSourceData loadInternal(UUID offeringId) {
         var enrolled = enrollments.findForAttendanceSummary(offeringId).stream().map(enrollment -> {
             var student = enrollment.getStudent();
             var groupIds = enrollment.getGroups().stream().map(group -> group.getId())

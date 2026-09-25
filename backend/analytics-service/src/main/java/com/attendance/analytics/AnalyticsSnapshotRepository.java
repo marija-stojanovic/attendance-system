@@ -2,6 +2,7 @@ package com.attendance.analytics;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -29,14 +30,18 @@ public class AnalyticsSnapshotRepository {
         }
     }
 
-    public AnalyticsData.Source load(UUID offeringId) {
-        String source = jdbc.queryForObject(
-                "SELECT source_data::text FROM analytics_snapshots WHERE offering_id = ?",
-                String.class, offeringId);
+    public Optional<AnalyticsData.Source> load(UUID offeringId) {
+        var rows = jdbc.query("SELECT source_data::text FROM analytics_snapshots WHERE offering_id = ?",
+                (result, row) -> result.getString(1), offeringId);
+        if (rows.isEmpty()) return Optional.empty();
         try {
-            return json.readValue(source, AnalyticsData.Source.class);
+            return Optional.of(json.readValue(rows.getFirst(), AnalyticsData.Source.class));
         } catch (JsonProcessingException error) {
             throw new IllegalStateException("Sačuvani podaci analitike nisu ispravni.", error);
         }
+    }
+
+    public void delete(UUID offeringId) {
+        jdbc.update("DELETE FROM analytics_snapshots WHERE offering_id = ?", offeringId);
     }
 }

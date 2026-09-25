@@ -51,6 +51,7 @@ public class AnalyticsSecurity {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/internal/analytics/**").permitAll()
                         .requestMatchers("/api/**").hasRole("EMPLOYEE")
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(o -> o.jwt(j -> j.decoder(decoder).jwtAuthenticationConverter(converter)))
