@@ -6,7 +6,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import com.attendance.course.realtime.RealtimeEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -35,7 +38,12 @@ public class AnalyticsSyncService {
         this.analytics = RestClient.builder().baseUrl(baseUrl).requestFactory(requests).build();
     }
 
-    @Scheduled(fixedDelayString = "${analytics-service.sync-interval-ms:2000}")
+    @EventListener
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    public void syncOnChange(RealtimeEvent event) {
+        if (event.offeringId() != null && !"QR_CHANGED".equals(event.type())) sync();
+    }
+
     public void sync() {
         for (int count = 0; count < 20; count++) {
             try {

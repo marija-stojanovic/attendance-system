@@ -102,7 +102,6 @@ auth-service:
 analytics-service:
   base-url: ${ANALYTICS_SERVICE_URL:http://localhost:8082}
   internal-key: ${INTERNAL_SERVICE_KEY:local-internal-service-key-change-me}
-  sync-interval-ms: ${ANALYTICS_SYNC_INTERVAL_MS:2000}
 
 management:
   endpoints:
