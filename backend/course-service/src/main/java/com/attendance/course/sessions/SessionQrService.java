@@ -40,21 +40,15 @@ public class SessionQrService {
     private static final JOSEObjectType TYPE = new JOSEObjectType("attendance-qr+jwt");
     private final TeachingSessionRepository sessions;
     private final Clock clock;
-    private final int interval;
     private final byte[] signingKey;
     private final String frontendOrigin;
 
     @Autowired
     public SessionQrService(TeachingSessionRepository sessions, Clock qrClock, SecretKey applicationKey,
-            @Value("${session-qr.rotation-seconds:30}") int interval,
             @Value("${authentication.frontend-origin:http://localhost:5173}") String frontendOrigin)
             throws java.security.GeneralSecurityException {
-        if (interval < 5 || interval > 300) {
-            throw new IllegalArgumentException("Interval QR koda mora biti između 5 i 300 sekundi.");
-        }
         this.sessions = sessions;
         this.clock = qrClock;
-        this.interval = interval;
         this.frontendOrigin = frontendOrigin.replaceAll("/+$", "");
         Mac derivation = Mac.getInstance("HmacSHA256");
         derivation.init(applicationKey);
@@ -63,7 +57,7 @@ public class SessionQrService {
 
     SessionQrService(TeachingSessionRepository sessions, Clock qrClock, SecretKey applicationKey, int interval)
             throws java.security.GeneralSecurityException {
-        this(sessions, qrClock, applicationKey, interval, "http://localhost:5173");
+        this(sessions, qrClock, applicationKey, "http://localhost:5173");
     }
 
     public Instant now() {
@@ -79,6 +73,7 @@ public class SessionQrService {
     public QrResponse generate(TeachingSession session) {
         Instant now = now();
         Instant issuedAt = windowStart(session, now);
+        int interval = session.getQrRotationSeconds();
         Instant expiresAt = issuedAt.plusSeconds(interval);
         try {
             var claims = new JWTClaimsSet.Builder().subject(session.getId().toString())
@@ -107,6 +102,7 @@ public class SessionQrService {
             TeachingSession session = sessions.findById(sessionId).orElseThrow(() -> invalid());
             Instant now = now();
             Instant issuedAt = windowStart(session, now);
+            int interval = session.getQrRotationSeconds();
             if (!Date.from(issuedAt).equals(claims.getIssueTime())
                     || !Date.from(issuedAt.plusSeconds(interval)).equals(claims.getExpirationTime())) throw invalid();
             return sessionId;
@@ -141,6 +137,7 @@ public class SessionQrService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "QR kod je dostupan samo za aktivnu sesiju.");
         }
         long elapsed = now.getEpochSecond() - session.getQrStartedAt().getEpochSecond();
+        int interval = session.getQrRotationSeconds();
         return session.getQrStartedAt().plusSeconds(elapsed / interval * interval);
     }
 

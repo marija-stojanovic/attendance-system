@@ -40,7 +40,7 @@ public class TeachingSessionService {
         requireCourse(courseId);
         TeachingGroup group = requireGroup(courseId, request.groupId());
         return SessionResponse.from(sessions.saveAndFlush(
-                new TeachingSession(group, request.date(), request.startTime())));
+                new TeachingSession(group, request.date(), request.startTime(), request.qrRotationSeconds())));
     }
 
     public List<SessionResponse> findByCourse(UUID courseId) {
@@ -68,7 +68,7 @@ public class TeachingSessionService {
         TeachingSession session = requireForUpdate(id);
         requireStatus(session, SessionStatus.CREATED, "Samo neaktivirana sesija može se mijenjati.");
         TeachingGroup group = requireGroup(session.getCourse().getId(), request.groupId());
-        session.update(group, request.date(), request.startTime());
+        session.update(group, request.date(), request.startTime(), request.qrRotationSeconds());
         return SessionResponse.from(session);
     }
 

@@ -40,13 +40,21 @@ public class TeachingSession {
     @Column(name = "qr_started_at")
     private Instant qrStartedAt;
 
+    @Column(name = "qr_rotation_seconds", nullable = false)
+    private int qrRotationSeconds = 30;
+
     protected TeachingSession() {
     }
 
     public TeachingSession(TeachingGroup group, LocalDate date, LocalTime startTime) {
+        this(group, date, startTime, 30);
+    }
+
+    public TeachingSession(TeachingGroup group, LocalDate date, LocalTime startTime, int qrRotationSeconds) {
         this.group = group;
         this.date = date;
         this.startTime = startTime;
+        this.qrRotationSeconds = qrRotationSeconds;
     }
 
     @PrePersist
@@ -55,9 +63,14 @@ public class TeachingSession {
     }
 
     void update(TeachingGroup group, LocalDate date, LocalTime startTime) {
+        update(group, date, startTime, qrRotationSeconds);
+    }
+
+    void update(TeachingGroup group, LocalDate date, LocalTime startTime, int qrRotationSeconds) {
         this.group = group;
         this.date = date;
         this.startTime = startTime;
+        this.qrRotationSeconds = qrRotationSeconds;
     }
 
     void activate(Instant now) {
@@ -103,5 +116,9 @@ public class TeachingSession {
 
     public Instant getQrStartedAt() {
         return qrStartedAt;
+    }
+
+    public int getQrRotationSeconds() {
+        return qrRotationSeconds;
     }
 }
