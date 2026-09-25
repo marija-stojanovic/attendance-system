@@ -14,11 +14,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class CourseDataClient {
     private final RestClient client;
 
-    public CourseDataClient(@Value("${course-service.base-url}") String baseUrl) {
+    public CourseDataClient(RestClient.Builder builder, @Value("${course-service.base-url}") String baseUrl) {
         var requests = new SimpleClientHttpRequestFactory();
         requests.setConnectTimeout(3000);
         requests.setReadTimeout(5000);
-        client = RestClient.builder().baseUrl(baseUrl).requestFactory(requests).build();
+        client = builder.baseUrl(baseUrl).requestFactory(requests).build();
     }
 
     public AnalyticsData.Source load(UUID offeringId, String bearerToken) {

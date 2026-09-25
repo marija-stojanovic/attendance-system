@@ -26,7 +26,7 @@ public class AnalyticsSyncService {
 
     public AnalyticsSyncService(JdbcTemplate jdbc, PlatformTransactionManager manager,
             AnalyticsSourceService sources, @Value("${analytics-service.base-url}") String baseUrl,
-            @Value("${analytics-service.internal-key}") String internalKey) {
+            @Value("${analytics-service.internal-key}") String internalKey, RestClient.Builder builder) {
         this.jdbc = jdbc;
         this.transactions = new TransactionTemplate(manager);
         this.transactions.setIsolationLevel(TransactionTemplate.ISOLATION_REPEATABLE_READ);
@@ -35,7 +35,7 @@ public class AnalyticsSyncService {
         var requests = new SimpleClientHttpRequestFactory();
         requests.setConnectTimeout(3000);
         requests.setReadTimeout(10000);
-        this.analytics = RestClient.builder().baseUrl(baseUrl).requestFactory(requests).build();
+        this.analytics = builder.baseUrl(baseUrl).requestFactory(requests).build();
     }
 
     @EventListener
