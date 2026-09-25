@@ -3,7 +3,7 @@ import { CreateSessionForm } from './CreateSessionForm';
 import { downloadReport } from './downloadReport';
 
 type Course = { id: string; code: string; name: string };
-type Session = { id: string; offeringId: string; groupId: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string };
+type Session = { id: string; offeringId: string; groupId: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string; qrRotationSeconds: number };
 type Qr = { imageDataUrl: string; pin: string; expiresAt: string; serverTime: string };
 type Attendance = { id: string; studentId: string; firstName: string; lastName: string; indexNumber: string; groupNumber: string; recordedAt: string; ipAddress: string; userAgent: string };
 const activities: Record<string, string> = {
@@ -99,10 +99,7 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
-  const [attendanceReload, setAttendanceReload] = useState(0);
   const [deletingAttendanceId, setDeletingAttendanceId] = useState('');
-  const [attendanceRefreshing, setAttendanceRefreshing] = useState(false);
-  const [attendanceUpdatedAt, setAttendanceUpdatedAt] = useState<Date | null>(null);
   const selected = sessions.find(session => session.id === sessionId);
   useEffect(() => {
     const controller = new AbortController();
@@ -132,7 +129,6 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
   }, [apiUrl, token, selected?.id, selected?.status]);
   useEffect(() => {
     setAttendances([]);
-    setAttendanceUpdatedAt(null);
     if (!selected) return;
     const selectedSession = selected;
     const controller = new AbortController();
@@ -141,19 +137,14 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
     async function loadAttendances() {
       if (loading || controller.signal.aborted) return;
       loading = true;
-      setAttendanceRefreshing(true);
       try {
         const data = await request<Attendance[]>(`${apiUrl}/api/sessions/${selectedSession.id}/attendances`,
           token, controller.signal);
-        if (!controller.signal.aborted) {
-          setAttendances(data);
-          setAttendanceUpdatedAt(new Date());
-        }
+        if (!controller.signal.aborted) setAttendances(data);
       } catch (e) {
         if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Spisak prisutnih nije dostupan.');
       } finally {
         loading = false;
-        if (!controller.signal.aborted) setAttendanceRefreshing(false);
       }
     }
     void loadAttendances();
@@ -162,7 +153,7 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
       controller.abort();
       if (timer) clearInterval(timer);
     };
-  }, [apiUrl, token, selected?.id, selected?.status, attendanceReload]);
+  }, [apiUrl, token, selected?.id, selected?.status]);
   async function changeState(action: 'activate' | 'close') {
     if (!selected) return;
     setBusy(true);
@@ -236,7 +227,8 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
       <h3>Detalji sesije</h3>
       <p>Predmet: {courses.find(course => course.id === courseId)?.name}<br />
         Datum: {selected.date}<br />Vrijeme početka: {selected.startTime.slice(0, 5)}<br />
-        Oblik aktivnosti: {activities[selected.activityType]}<br />Grupa: {selected.groupNumber}</p>
+        Oblik aktivnosti: {activities[selected.activityType]}<br />Grupa: {selected.groupNumber}<br />
+        Promjena QR koda: {selected.qrRotationSeconds} sekundi</p>
       <p>Stanje: {statuses[selected.status]}</p>
       <div className="report-downloads">
         <strong>Evidencija prisustva za ovu sesiju</strong>
@@ -255,11 +247,7 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
         {!busy && <QrDisplay key={selected.id} url={`${apiUrl}/api/sessions/${selected.id}/qr`} token={token} />}
       </>}
       <div className="attendance-list">
-        <div className="panel-heading"><div><h3>Prisutni studenti ({attendances.length})</h3>
-          {selected.status === 'ACTIVE' && <span className="live-status">Automatsko osvježavanje svake 2 sekunde</span>}
-          {attendanceUpdatedAt && <span className="update-time">Posljednje osvježavanje: {attendanceUpdatedAt.toLocaleTimeString('bs-BA')}</span>}
-        </div><button disabled={busy || attendanceRefreshing}
-          onClick={() => setAttendanceReload(value => value + 1)}>{attendanceRefreshing ? 'Osvježavanje…' : 'Osvježi'}</button></div>
+        <h3>Prisutni studenti ({attendances.length})</h3>
         {attendances.length === 0 ? <p>Prisustvo još nije evidentirano.</p> : <div className="table-scroll"><table>
           <thead><tr><th>Student</th><th>Indeks</th><th>Grupa</th><th>Vrijeme prijave</th><th>IP adresa</th><th>Uređaj</th><th></th></tr></thead>
           <tbody>{attendances.map(item => <tr key={item.id}><td>{item.lastName} {item.firstName}</td>

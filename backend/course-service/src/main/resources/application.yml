@@ -23,9 +23,6 @@ spring:
 students:
   email-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.unibl.org}
 
-session-qr:
-  rotation-seconds: ${QR_ROTATION_SECONDS:30}
-
 teaching-session:
   max-active-seconds: ${SESSION_MAX_ACTIVE_SECONDS:14400}
   expiration-check-milliseconds: 60000
@@ -86,7 +83,7 @@ group-assignment:
             - { prefix: "12", from: 27, to: 49 }
         - group: L9
           ranges:
-            - { prefix: "12", from: 51, to: 55 }
+            - { prefix: "12", from: 50, to: 55 }
             - { prefix: "13", from: 1, to: 16 }
         - group: L10
           ranges:

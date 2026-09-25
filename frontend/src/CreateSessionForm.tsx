@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 
 type Offering = { id: string; academicYear: string; studyProgram: string; studyType: string; yearOfStudy: number; semester: number };
 type Group = { id: string; activityType: string; groupNumber: string };
-type Session = { id: string; offeringId: string; groupId: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string };
+type Session = { id: string; offeringId: string; groupId: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string; qrRotationSeconds: number };
 type Props = { apiUrl: string; token: string; courseId: string; session?: Session; onCancel: () => void; onCreated: (session: Session) => void };
 const activities: Record<string, string> = {
   LECTURE: 'Predavanje', AUDITORY_EXERCISE: 'Auditorne vježbe', LABORATORY_EXERCISE: 'Laboratorijske vježbe'
@@ -16,6 +16,7 @@ export function CreateSessionForm({ apiUrl, token, courseId, session, onCancel, 
   const [groupId, setGroupId] = useState(session?.groupId || '');
   const [date, setDate] = useState(session?.date || '');
   const [time, setTime] = useState(session?.startTime.slice(0, 5) || '');
+  const [qrRotationSeconds, setQrRotationSeconds] = useState(session?.qrRotationSeconds || 30);
   const [loadingOfferings, setLoadingOfferings] = useState(true);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -58,7 +59,7 @@ export function CreateSessionForm({ apiUrl, token, courseId, session, onCancel, 
     try {
       const response = await fetch(session ? apiUrl + '/api/sessions/' + session.id : apiUrl + '/api/courses/' + courseId + '/sessions', {
         method: session ? 'PUT' : 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupId, date, startTime: time })
+        body: JSON.stringify({ groupId, date, startTime: time, qrRotationSeconds })
       });
       if (!response.ok) {
         const problem = await response.json().catch(() => ({}));
@@ -94,6 +95,9 @@ export function CreateSessionForm({ apiUrl, token, courseId, session, onCancel, 
     </select></label>
     <label>Datum<input type="date" required disabled={saving} value={date} onChange={e => setDate(e.target.value)} /></label>
     <label>Vrijeme početka<input type="time" required disabled={saving} value={time} onChange={e => setTime(e.target.value)} /></label>
+    <label>Interval osvježavanja QR koda (sekunde)<input type="number" required min="5" max="300" step="1"
+      disabled={saving} value={qrRotationSeconds} onChange={e => setQrRotationSeconds(Number(e.target.value))} />
+      <small>QR kod će se automatski promijeniti nakon unesenog broja sekundi.</small></label>
     <div><button type="submit" disabled={saving || loading || !groupId || !date || !time}>
       {saving ? 'Čuvanje…' : session ? 'Sačuvaj izmjene' : 'Sačuvaj sesiju'}
     </button><button type="button" disabled={saving} onClick={onCancel}>Odustani</button></div>
