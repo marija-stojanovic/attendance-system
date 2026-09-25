@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useRealtime } from './useRealtime';
 
 type Props = { apiUrl: string; analyticsUrl: string; token: string };
 type Course = { id: string; code: string; name: string };
@@ -121,6 +122,12 @@ export function AttendanceAnalyticsPanel({ apiUrl, analyticsUrl, token }: Props)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
+  useRealtime(apiUrl, token, event => {
+    if (event.type === 'CONNECTED'
+        || (event.type !== 'QR_CHANGED' && event.offeringId === offeringId)) {
+      setReload(value => value + 1);
+    }
+  });
 
   async function request<T>(baseUrl: string, path: string, signal: AbortSignal): Promise<T> {
     const response = await fetch(baseUrl + path, {

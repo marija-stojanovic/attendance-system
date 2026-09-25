@@ -4,6 +4,8 @@ import com.attendance.course.CourseRepository;
 import com.attendance.course.TeachingGroup;
 import com.attendance.course.TeachingGroupRepository;
 import com.attendance.course.CourseEmployeeRepository;
+import com.attendance.course.realtime.QrRotationNotifier;
+import com.attendance.course.realtime.RealtimePublisher;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -19,14 +21,19 @@ public class TeachingSessionService {
     private final TeachingGroupRepository groups;
     private final SessionQrService qr;
     private final CourseEmployeeRepository courseEmployees;
+    private final RealtimePublisher realtime;
+    private final QrRotationNotifier qrRotations;
 
     public TeachingSessionService(TeachingSessionRepository sessions, CourseRepository courses,
-            TeachingGroupRepository groups, SessionQrService qr, CourseEmployeeRepository courseEmployees) {
+            TeachingGroupRepository groups, SessionQrService qr, CourseEmployeeRepository courseEmployees,
+            RealtimePublisher realtime, QrRotationNotifier qrRotations) {
         this.sessions = sessions;
         this.courses = courses;
         this.groups = groups;
         this.qr = qr;
         this.courseEmployees = courseEmployees;
+        this.realtime = realtime;
+        this.qrRotations = qrRotations;
     }
 
     @Transactional
@@ -39,8 +46,10 @@ public class TeachingSessionService {
     public SessionResponse create(UUID courseId, SessionRequest request) {
         requireCourse(courseId);
         TeachingGroup group = requireGroup(courseId, request.groupId());
-        return SessionResponse.from(sessions.saveAndFlush(
-                new TeachingSession(group, request.date(), request.startTime(), request.qrRotationSeconds())));
+        TeachingSession session = sessions.saveAndFlush(
+                new TeachingSession(group, request.date(), request.startTime(), request.qrRotationSeconds()));
+        changed(session);
+        return SessionResponse.from(session);
     }
 
     public List<SessionResponse> findByCourse(UUID courseId) {
@@ -69,6 +78,7 @@ public class TeachingSessionService {
         requireStatus(session, SessionStatus.CREATED, "Samo neaktivirana sesija može se mijenjati.");
         TeachingGroup group = requireGroup(session.getCourse().getId(), request.groupId());
         session.update(group, request.date(), request.startTime(), request.qrRotationSeconds());
+        changed(session);
         return SessionResponse.from(session);
     }
 
@@ -84,6 +94,8 @@ public class TeachingSessionService {
         requireStatus(session, SessionStatus.CREATED, "Samo kreirana sesija može se aktivirati.");
         session.activate(qr.now());
         qr.generate(session);
+        qrRotations.schedule(session);
+        changed(session);
         return SessionResponse.from(session);
     }
 
@@ -98,6 +110,8 @@ public class TeachingSessionService {
         TeachingSession session = requireForUpdate(id);
         requireStatus(session, SessionStatus.ACTIVE, "Samo aktivna sesija može se zatvoriti.");
         session.close();
+        qrRotations.cancel(session.getId());
+        changed(session);
         return SessionResponse.from(session);
     }
 
@@ -146,5 +160,9 @@ public class TeachingSessionService {
 
     private ResponseStatusException notFound() {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "Sesija nije pronađena.");
+    }
+
+    private void changed(TeachingSession session) {
+        realtime.sessionChanged(session.getCourse().getId(), session.getGroup().getOffering().getId(), session.getId());
     }
 }

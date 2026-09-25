@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CreateSessionForm } from './CreateSessionForm';
 import { downloadReport } from './downloadReport';
+import { useRealtime } from './useRealtime';
 
 type Course = { id: string; code: string; name: string };
 type Session = { id: string; offeringId: string; groupId: string; groupNumber: string; activityType: string; date: string; startTime: string; status: string; qrRotationSeconds: number };
@@ -21,19 +22,17 @@ async function request<T>(url: string, token: string, signal: AbortSignal, metho
   return response.json();
 }
 
-function QrDisplay({ url, token }: { url: string; token: string }) {
+function QrDisplay({ url, token, revision }: { url: string; token: string; revision: number }) {
   const [qr, setQr] = useState<{ image: string; pin: string; deadline: number } | null>(null);
   const [remaining, setRemaining] = useState(0);
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
     let expiry: ReturnType<typeof setTimeout>;
     let busy = false;
     async function refresh() {
       if (busy || controller.signal.aborted) return;
       busy = true;
-      clearTimeout(timer);
       const started = performance.now();
       try {
         const data = await request<Qr>(url, token, controller.signal);
@@ -48,12 +47,10 @@ function QrDisplay({ url, token }: { url: string; token: string }) {
         } else {
           setQr(null);
         }
-        timer = setTimeout(() => void refresh(), Math.max(200, lifetime));
       } catch (e) {
         if (controller.signal.aborted) return;
         setQr(null);
         setError(e instanceof Error ? e.message : 'Osvježavanje QR koda nije uspjelo.');
-        timer = setTimeout(() => void refresh(), 2000);
       } finally { busy = false; }
     }
     function visibility() {
@@ -64,11 +61,10 @@ function QrDisplay({ url, token }: { url: string; token: string }) {
     document.addEventListener('visibilitychange', visibility);
     return () => {
       controller.abort();
-      clearTimeout(timer);
       clearTimeout(expiry);
       document.removeEventListener('visibilitychange', visibility);
     };
-  }, [url, token]);
+  }, [url, token, revision]);
   useEffect(() => {
     if (!qr) return;
     const timer = setInterval(() => {
@@ -100,7 +96,27 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
   const [editing, setEditing] = useState(false);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
   const [deletingAttendanceId, setDeletingAttendanceId] = useState('');
+  const [sessionRevision, setSessionRevision] = useState(0);
+  const [attendanceRevision, setAttendanceRevision] = useState(0);
+  const [qrRevision, setQrRevision] = useState(0);
   const selected = sessions.find(session => session.id === sessionId);
+  useRealtime(apiUrl, token, event => {
+    if (event.type === 'CONNECTED') {
+      setSessionRevision(value => value + 1);
+      setAttendanceRevision(value => value + 1);
+      setQrRevision(value => value + 1);
+      return;
+    }
+    if (event.courseId === courseId && event.type === 'SESSION_CHANGED') {
+      setSessionRevision(value => value + 1);
+    }
+    if (event.sessionId === sessionId && event.type === 'ATTENDANCE_CHANGED') {
+      setAttendanceRevision(value => value + 1);
+    }
+    if (event.sessionId === sessionId && event.type === 'QR_CHANGED') {
+      setQrRevision(value => value + 1);
+    }
+  });
   useEffect(() => {
     const controller = new AbortController();
     request<Course[]>(apiUrl + '/api/courses', token, controller.signal).then(setCourses)
@@ -116,23 +132,12 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
     request<Session[]>(`${apiUrl}/api/courses/${courseId}/sessions`, token, controller.signal).then(setSessions)
       .catch(e => { if (!controller.signal.aborted) setError(e.message); });
     return () => controller.abort();
-  }, [apiUrl, token, courseId, reload]);
-  useEffect(() => {
-    if (!selected || selected.status !== 'ACTIVE') return;
-    const controller = new AbortController();
-    const timer = setInterval(() => {
-      request<Session>(`${apiUrl}/api/sessions/${selected.id}`, token, controller.signal)
-        .then(updated => setSessions(previous => previous.map(s => s.id === updated.id ? updated : s)))
-        .catch(() => {});
-    }, 2000);
-    return () => { clearInterval(timer); controller.abort(); };
-  }, [apiUrl, token, selected?.id, selected?.status]);
+  }, [apiUrl, token, courseId, reload, sessionRevision]);
   useEffect(() => {
     setAttendances([]);
     if (!selected) return;
     const selectedSession = selected;
     const controller = new AbortController();
-    let timer: ReturnType<typeof setInterval> | undefined;
     let loading = false;
     async function loadAttendances() {
       if (loading || controller.signal.aborted) return;
@@ -148,12 +153,8 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
       }
     }
     void loadAttendances();
-    if (selectedSession.status === 'ACTIVE') timer = setInterval(() => void loadAttendances(), 2000);
-    return () => {
-      controller.abort();
-      if (timer) clearInterval(timer);
-    };
-  }, [apiUrl, token, selected?.id, selected?.status]);
+    return () => controller.abort();
+  }, [apiUrl, token, selected?.id, attendanceRevision]);
   async function changeState(action: 'activate' | 'close') {
     if (!selected) return;
     setBusy(true);
@@ -244,7 +245,8 @@ export function SessionQrPanel({ apiUrl, token }: { apiUrl: string; token: strin
       {selected.status === 'CREATED' && <button disabled={busy} onClick={() => void changeState('activate')}>Aktiviraj sesiju</button>}
       {selected.status === 'ACTIVE' && <>
         <button disabled={busy} onClick={() => void changeState('close')}>Zatvori sesiju</button>
-        {!busy && <QrDisplay key={selected.id} url={`${apiUrl}/api/sessions/${selected.id}/qr`} token={token} />}
+        {!busy && <QrDisplay key={selected.id} url={`${apiUrl}/api/sessions/${selected.id}/qr`} token={token}
+          revision={qrRevision} />}
       </>}
       <div className="attendance-list">
         <h3>Prisutni studenti ({attendances.length})</h3>

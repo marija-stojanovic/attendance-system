@@ -8,6 +8,7 @@ import com.attendance.course.sessions.TeachingSessionRepository;
 import java.util.UUID;
 import java.util.List;
 import com.attendance.course.CourseEmployeeRepository;
+import com.attendance.course.realtime.RealtimePublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -23,16 +24,18 @@ public class AttendanceService {
     private final EnrollmentRepository enrollments;
     private final SessionQrService qr;
     private final CourseEmployeeRepository courseEmployees;
+    private final RealtimePublisher realtime;
 
     public AttendanceService(AttendanceRepository attendances, TeachingSessionRepository sessions,
             StudentRepository students, EnrollmentRepository enrollments, SessionQrService qr,
-            CourseEmployeeRepository courseEmployees) {
+            CourseEmployeeRepository courseEmployees, RealtimePublisher realtime) {
         this.attendances = attendances;
         this.sessions = sessions;
         this.students = students;
         this.enrollments = enrollments;
         this.qr = qr;
         this.courseEmployees = courseEmployees;
+        this.realtime = realtime;
     }
 
     @Transactional(readOnly = true)
@@ -48,6 +51,7 @@ public class AttendanceService {
         Attendance attendance = attendances.findByIdAndSessionId(attendanceId, sessionId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Evidencija prisustva nije pronađena."));
         attendances.delete(attendance);
+        changed(attendance.getSession());
     }
 
     @Transactional
@@ -90,6 +94,7 @@ public class AttendanceService {
         try {
             Attendance attendance = attendances.saveAndFlush(new Attendance(session, student, qr.now(),
                     client.ipAddress(), client.userAgent(), requestId));
+            changed(session);
             return AttendanceResponse.from(attendance);
         } catch (DataIntegrityViolationException exception) {
             throw duplicate();
@@ -111,5 +116,10 @@ public class AttendanceService {
 
     private ResponseStatusException invalidQr() {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "QR token nije važeći.");
+    }
+
+    private void changed(TeachingSession session) {
+        realtime.attendanceChanged(session.getCourse().getId(), session.getGroup().getOffering().getId(),
+                session.getId());
     }
 }
