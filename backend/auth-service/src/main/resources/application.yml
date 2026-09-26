@@ -1,45 +1,5 @@
 spring:
   application:
     name: auth-service
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/course_db}
-    username: ${DB_USERNAME:course_user}
-    password: ${DB_PASSWORD:course_password}
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
-  flyway:
-    enabled: false
-
-server:
-  port: 8083
-
-internal:
-  service-key: ${INTERNAL_SERVICE_KEY:local-internal-service-key-change-me}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-
-eureka:
-  client:
-    service-url:
-      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
-  instance:
-    prefer-ip-address: true
-
-authentication:
-  app-issuer: https://attendance-system.local
-  audience: course-service
-  jwt-secret: ${APP_JWT_SECRET:local-development-secret-change-me-123456789}
-  token-lifetime-seconds: 1800
-  google-client-id: ${GOOGLE_CLIENT_ID:}
-  student-domain: ${STUDENT_EMAIL_DOMAIN:student.etf.unibl.org}
-  allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:5173}
-  test-employee-enabled: ${TEST_EMPLOYEE_ENABLED:true}
-  test-employee-username: ${TEST_EMPLOYEE_USERNAME:profesor}
-  test-employee-password: ${TEST_EMPLOYEE_PASSWORD:Profesor123!}
-  test-employee-email: ${TEST_EMPLOYEE_EMAIL:profesor@etf.unibl.org}
+  config:
+    import: configserver:${CONFIG_SERVER_URL:http://localhost:8888}
