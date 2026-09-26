@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GoogleLogin, GoogleOAuthProvider, googleLogout } from '@react-oauth/google';
 import './style.css';
@@ -13,16 +13,17 @@ const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 const authUrl = import.meta.env.VITE_AUTH_URL || 'http://localhost:8083';
 const analyticsUrl = import.meta.env.VITE_ANALYTICS_URL || 'http://localhost:8082';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const tokenKey = 'attendance.accessToken';
 type Identity = { email: string; role: string; studentId: string | null };
 type LoginResponse = { token: string };
 type Registration = { token: string; email: string; firstName: string | null; lastName: string | null };
 type GoogleLoginResponse = LoginResponse & { registrationRequired: boolean; registration: Registration | null };
 
 function App() {
-  const [token, setToken] = useState('');
+  const [token, setToken] = useState(() => sessionStorage.getItem(tokenKey) || '');
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => Boolean(sessionStorage.getItem(tokenKey)));
   const [username, setUsername] = useState('profesor');
   const [password, setPassword] = useState('');
   const [registration, setRegistration] = useState<Registration | null>(null);
@@ -34,6 +35,11 @@ function App() {
   const [importMessage, setImportMessage] = useState('');
   const [importPreviewOpen, setImportPreviewOpen] = useState(false);
 
+  useEffect(() => {
+    const savedToken = sessionStorage.getItem(tokenKey);
+    if (savedToken) void loadIdentity(savedToken);
+  }, []);
+
   async function loadIdentity(accessToken: string) {
     setLoading(true);
     setError('');
@@ -43,6 +49,10 @@ function App() {
       });
       if (!response.ok) {
         setIdentity(null);
+        if (response.status === 401 || response.status === 403) {
+          sessionStorage.removeItem(tokenKey);
+          setToken('');
+        }
         if (response.status === 403) {
           const problem = await response.json().catch(() => ({}));
           throw new Error(problem.detail || 'Nemate pravo pristupa.');
@@ -65,6 +75,7 @@ function App() {
       });
       if (!response.ok) throw new Error('Prijava nije uspjela. Provjerite unesene podatke.');
       const result: LoginResponse = await response.json();
+      sessionStorage.setItem(tokenKey, result.token);
       setToken(result.token);
       await loadIdentity(result.token);
     } catch (e) { setError(e instanceof Error ? e.message : 'Prijava nije uspjela.'); }
@@ -86,6 +97,7 @@ function App() {
         setLastName(result.registration.lastName || '');
         return;
       }
+      sessionStorage.setItem(tokenKey, result.token);
       setToken(result.token);
       await loadIdentity(result.token);
     } catch (e) { setError(e instanceof Error ? e.message : 'Google prijava nije uspjela.'); }
@@ -108,6 +120,7 @@ function App() {
       }
       const result: LoginResponse = await response.json();
       setRegistration(null);
+      sessionStorage.setItem(tokenKey, result.token);
       setToken(result.token);
       await loadIdentity(result.token);
     } catch (e) { setError(e instanceof Error ? e.message : 'Registracija nije uspjela.'); }
@@ -116,6 +129,7 @@ function App() {
 
   function logout() {
     googleLogout();
+    sessionStorage.removeItem(tokenKey);
     setToken('');
     setIdentity(null);
     setRegistration(null);
@@ -138,6 +152,7 @@ function App() {
     {error && <p role="alert" className="error">{error}</p>}
     {token ? <>
       {loading && <p role="status">Provjera naloga…</p>}
+      {!loading && !identity && <button type="button" onClick={() => void loadIdentity(token)}>Ponovo provjeri prijavu</button>}
       <div className="account-bar"><span>{identity
         ? `${identity.email} · ${identity.role === 'EMPLOYEE' ? 'Zaposleni' : 'Student'}`
         : 'Podaci o nalogu nisu učitani.'}</span>
