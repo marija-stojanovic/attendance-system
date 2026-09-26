@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/analytics_db}
+    username: ${DB_USERNAME:analytics_user}
+    password: ${DB_PASSWORD:analytics_password}
+  flyway:
+    enabled: true
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+course-service:
+  base-url: http://course-service
+
+attendance-analytics:
+  low-attendance-threshold-percent: ${ATTENDANCE_THRESHOLD_PERCENT:75}
+
+analytics-service:
+  internal-key: ${INTERNAL_SERVICE_KEY:local-internal-service-key-change-me}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+authentication:
+  app-issuer: https://attendance-system.local
+  audience: course-service
+  jwt-secret: ${APP_JWT_SECRET:local-development-secret-change-me-123456789}
+  allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:5173}

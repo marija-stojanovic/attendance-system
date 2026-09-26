@@ -1,11 +1,24 @@
 name: attendance-system
 
 services:
+  config-server:
+    build:
+      context: ./backend/config-server
+    ports:
+      - "${CONFIG_SERVER_PORT:-8888}:8888"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://localhost:8888/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   eureka-server:
     build:
       context: ./backend/eureka-server
     environment:
       EUREKA_HOSTNAME: eureka-server
+      CONFIG_SERVER_URL: http://config-server:8888
     ports:
       - "${EUREKA_PORT:-8761}:8761"
     healthcheck:
@@ -14,6 +27,9 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+    depends_on:
+      config-server:
+        condition: service_healthy
 
   frontend:
     build:
@@ -71,10 +87,13 @@ services:
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
       FRONTEND_ALLOWED_ORIGINS: ${FRONTEND_ALLOWED_ORIGINS:-http://localhost:5173}
       EUREKA_URL: http://eureka-server:8761/eureka/
+      CONFIG_SERVER_URL: http://config-server:8888
       INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-local-internal-service-key-change-me}
     ports:
       - "${COURSE_SERVICE_PORT:-8081}:8081"
     depends_on:
+      config-server:
+        condition: service_healthy
       eureka-server:
         condition: service_healthy
       postgres:
@@ -94,6 +113,7 @@ services:
       DB_USERNAME: ${ANALYTICS_POSTGRES_USER:-analytics_user}
       DB_PASSWORD: ${ANALYTICS_POSTGRES_PASSWORD:-analytics_password}
       EUREKA_URL: http://eureka-server:8761/eureka/
+      CONFIG_SERVER_URL: http://config-server:8888
       APP_JWT_SECRET: ${APP_JWT_SECRET:-local-development-secret-change-me-123456789}
       INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-local-internal-service-key-change-me}
       ATTENDANCE_THRESHOLD_PERCENT: ${ATTENDANCE_THRESHOLD_PERCENT:-75}
@@ -101,6 +121,8 @@ services:
     ports:
       - "${ANALYTICS_SERVICE_PORT:-8082}:8082"
     depends_on:
+      config-server:
+        condition: service_healthy
       eureka-server:
         condition: service_healthy
       analytics-postgres:
@@ -130,6 +152,7 @@ services:
       TEST_EMPLOYEE_EMAIL: ${TEST_EMPLOYEE_EMAIL:-profesor@etf.unibl.org}
       FRONTEND_ALLOWED_ORIGINS: ${FRONTEND_ALLOWED_ORIGINS:-http://localhost:5173}
       EUREKA_URL: http://eureka-server:8761/eureka/
+      CONFIG_SERVER_URL: http://config-server:8888
       INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-local-internal-service-key-change-me}
     ports:
       - "${AUTH_SERVICE_PORT:-8083}:8083"
@@ -140,6 +163,8 @@ services:
       retries: 10
       start_period: 20s
     depends_on:
+      config-server:
+        condition: service_healthy
       eureka-server:
         condition: service_healthy
       course-service:
