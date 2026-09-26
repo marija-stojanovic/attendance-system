@@ -40,4 +40,5 @@ authentication:
   test-employee-enabled: ${TEST_EMPLOYEE_ENABLED:true}
   test-employee-username: ${TEST_EMPLOYEE_USERNAME:profesor}
   test-employee-password: ${TEST_EMPLOYEE_PASSWORD:Profesor123!}
+  public-deployment: ${PUBLIC_DEPLOYMENT:false}
   test-employee-email: ${TEST_EMPLOYEE_EMAIL:profesor@etf.unibl.org}
