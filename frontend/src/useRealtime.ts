@@ -16,7 +16,8 @@ export function useRealtime(apiUrl: string, token: string, receive: (event: Real
     let stopped = false;
     const connect = () => {
       if (stopped) return;
-      const url = apiUrl.replace(/^http/, 'ws').replace(/\/$/, '') + '/ws/realtime';
+      const url = new URL(apiUrl.replace(/\/$/, '') + '/ws/realtime', window.location.href);
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
       socket = new WebSocket(url);
       socket.onopen = () => socket?.send(JSON.stringify({ token }));
       socket.onmessage = message => {
