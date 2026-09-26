@@ -10,6 +10,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import com.attendance.course.realtime.RealtimeEvent;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -44,6 +45,8 @@ public class AnalyticsSyncService {
         if (event.offeringId() != null && !"QR_CHANGED".equals(event.type())) sync();
     }
 
+    @Scheduled(fixedDelayString = "${analytics-service.sync-delay-ms:2000}",
+            initialDelayString = "${analytics-service.sync-delay-ms:2000}")
     public void sync() {
         for (int count = 0; count < 20; count++) {
             try {
