@@ -202,7 +202,7 @@ class ImportCommitTests {
     }
 
     @Test
-    void assignsFirstYearLaboratoryGroupsAndReportsUncoveredIndex() throws Exception {
+    void assignsBothFirstYearGroupsDuringImport() throws Exception {
         String input = "Predmet;Šifra;Studijski program;Tip studija;Godina studija;Semestar;Oblik nastave;Grupa\n"
                 + "Testni predmet;GRUPE-1;Računarstvo i informatika;OSNOVNE;1;1;laboratorijske vježbe;1\n\n"
                 + "Prezime;Ime;Indeks;Status\n"
@@ -212,21 +212,20 @@ class ImportCommitTests {
 
         JsonNode result = upload(input, "2025/2026");
 
-        assertThat(result.get("groupsCreated").asInt()).isEqualTo(4);
-        assertThat(result.get("groupIds")).hasSize(4);
-        assertThat(result.get("groupMembershipsAdded").asInt()).isEqualTo(5);
-        assertThat(result.get("warnings")).hasSize(1);
-        assertThat(result.get("warnings").get(0).get("message").asText()).contains("1250/25");
+        assertThat(result.get("groupsCreated").asInt()).isEqualTo(5);
+        assertThat(result.get("groupIds")).hasSize(5);
+        assertThat(result.get("groupMembershipsAdded").asInt()).isEqualTo(6);
+        assertThat(result.get("warnings")).isEmpty();
         assertThat(groups.findAll()).extracting(TeachingGroup::getGroupNumber)
-                .containsExactlyInAnyOrder("G1", "G3", "L1", "L2");
+                .containsExactlyInAnyOrder("G1", "G3", "L1", "L2", "L9");
 
-        Integer uncoveredMemberships = jdbc.queryForObject("""
+        Integer assignedMemberships = jdbc.queryForObject("""
                 select count(*) from enrollment_groups eg
                 join enrollments e on e.id = eg.enrollment_id
                 join students s on s.id = e.student_id
                 where s.index_number = '1250/25'
                 """, Integer.class);
-        assertThat(uncoveredMemberships).isEqualTo(1);
+        assertThat(assignedMemberships).isEqualTo(2);
 
         Student student = students.findByIndexNumber("1101/25").orElseThrow();
         student.linkIdentity("https://accounts.google.com", "student-subject");
