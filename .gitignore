@@ -25,3 +25,4 @@ Thumbs.db
 /exports/
 /data/
 *.[mM][dD]
+!README.md
